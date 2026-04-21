@@ -162,21 +162,84 @@ database:
     backend.models.*: L2
 ```
 
+### 6.1 Pattern-matching semantics (MVP)
+
+All patterns in `publishes` / `subscribes` use **path-prefix matching with an optional `.*` suffix for readability**:
+
+- `routes.*` — matches `routes./api/users`, `routes./api/users.method`, `routes./api/users.auth_required`, and any other descendant of `routes.`
+- `routes` (no suffix) — equivalent to `routes.*`
+- `routes./api/users` — matches that exact path AND all its descendants (prefix match)
+- `*.method` — NOT supported in MVP (middle/suffix wildcards require a richer matcher; add post-hackathon)
+
+Implementation hint: strip any trailing `.*` from the pattern, then test if `change.path == pattern` OR `change.path.startswith(pattern + '.')`. That's it.
+
+**Scoping to a publishing agent:** when frontend declares `subscribes: backend.routes.*`, the pattern is `routes.*` within the backend agent's dictionary namespace. The router consults the publishing agent's `publishes` entries first, then cross-references against each subscriber's `subscribes` list.
+
 ## 7. Conflict resolution (MVP)
 
-Deterministic priority table only. No LLM.
+Deterministic, dual-mechanism. No LLM.
 
-```yaml
-# Priority per domain — higher index wins
-route_auth_changes:
-  winners: [backend, frontend, database]   # backend wins
-schema_changes:
-  winners: [database, backend, frontend]   # database wins
-component_changes:
-  winners: [frontend, backend, database]   # frontend wins
+### 7.1 Two kinds of conflict
+
+**Type A — Direct path conflict.** Two agents wrote to the same exact dot-path with different values within the same version window. Cheap to detect via version-vector comparison. Example: both backend and codex-test set `backend.routes./api/users.auth_required` to different values.
+
+**Type B — Semantic cross-reference conflict.** Two agents wrote to *different* dot-paths, but a declared rule says those paths must be kept consistent. Example: backend sets `backend.routes./api/users.auth_required = true`, but frontend's `frontend.api_calls./api/users.headers` has no `Authorization` entry. The paths don't overlap; the rule does.
+
+The demo's hero conflict is Type B. MVP ships both.
+
+### 7.2 Type A detection (generic)
+
+For each incoming `state_update` message, compare its diff paths against the receiver's own dictionary. If any path in the diff already exists in the receiver's dict with a different value, flag a Type A conflict.
+
+### 7.3 Type B detection (rules)
+
+Hardcoded in `mesh/conflict.py` as a list of rule objects (Python dataclasses, not YAML — MVP keeps it simple). Each rule has:
+
+- `id`: string — e.g. `auth_required_on_route`
+- `trigger`: `{agent, path_glob, value_predicate}` — when agent X changes a path matching this glob to a value satisfying this predicate
+- `required_peer`: `{agent, path_template}` — in agent Y's dict, a path interpolated from the trigger match's wildcards must exist (and optionally be truthy)
+- `winner`: which agent wins
+- `resolution_message`: template string for the follow-up message to the loser
+
+Example for the demo:
+
+```python
+ConflictRule(
+    id="auth_required_on_route",
+    trigger={
+        "agent": "backend",
+        "path_glob": "routes.{route}.auth_required",
+        "value_predicate": lambda v: v is True,
+    },
+    required_peer={
+        "agent": "frontend",
+        "path_template": "api_calls.{route}.headers.Authorization",
+        "must_exist": True,
+    },
+    winner="backend",
+    resolution_message=(
+        "Backend route {route} now requires authentication. "
+        "Please add an Authorization header to your api_calls.{route}."
+    ),
+)
 ```
 
-When `Conflict Detector` flags an incoming diff, it looks up the key pattern in the priority table, picks the winner, writes the resolution to the loser's `input.json` as a `response` message with `correlation_id` pointing to the original conflict, and broadcasts `conflict.detected` + `conflict.resolved` on the WebSocket.
+When backend's Mini Agent publishes a `routes.*.auth_required` diff, the Router also evaluates Type B rules where backend is the trigger. If frontend is the required_peer and the `Authorization` path is missing in frontend's dict, the Router emits a `conflict.detected` event (with both sides' state) and immediately writes a `response`-type message to frontend's `input.json` containing the interpolated `resolution_message`. Frontend's Mini Agent processes it on its next input-queue read and the scripted agent acts on it.
+
+### 7.4 Priority table
+
+Type A resolution falls back to a simple priority map in `mesh/conflict.py`:
+
+```python
+PRIORITY_BY_PATH_PREFIX = {
+    "routes":     ["backend", "frontend", "database"],
+    "schema":     ["database", "backend", "frontend"],
+    "api_calls":  ["frontend", "backend", "database"],
+    "auth":       ["backend", "frontend", "database"],
+}
+```
+
+For a Type A conflict on path `backend.routes./api/users.auth_required`, match the key by its second segment (`routes` in this case, since first is agent-id namespace), look up the ordered list, pick the agent closest to the head that is among the conflicting parties. Exact, deterministic, zero LLM.
 
 **Full spec has coordinator-escalate + LLM arbitration. We cut both.**
 
@@ -250,8 +313,53 @@ These appear in the full architecture doc and are **cut from the MVP**:
 - `pytest` — tests
 - No web framework — pure `websockets` library
 
-## 12. References
+## 12. Runtime orchestration (`demo/run_scenario.py`)
+
+Single Python process, multiple threads. Simpler than subprocesses.
+
+```
+demo/run_scenario.py
+├── main thread — orchestrates startup/shutdown
+├── asyncio event loop (on a dedicated thread)
+│   ├── mesh.ws_server  — serves WebSocket on :9900
+│   └── mesh.MiniAgent × 3  — file watchers + routing + conflict detection
+└── 3 worker threads — one per scripted "major agent" (backend / frontend / database)
+    └── each sleeps + mutates its .agentmesh/agents/{id}/dictionary.json per timeline
+```
+
+### 12.1 Startup sequence
+
+1. Create working dir `.agentmesh/` (wipe if exists). Create `.agentmesh/agents/{backend,frontend,database}/` with empty `dictionary.json`, `context.json`, `summary.json`, `input.json` files.
+2. Load `demo/dependency_map.yaml`.
+3. Start asyncio loop on a dedicated thread. Start `ws_server` (broadcasts `mesh.session.started`). Start 3 `MiniAgent` instances, each watching one agent dir.
+4. Brief sleep (100ms) to let file watchers settle.
+5. Spawn 3 worker threads, each running its scripted-agent timeline function (`demo.backend_agent.run_timeline()`, etc.). Each scripted agent knows its own dict path and uses `atomic_write_json` for every mutation.
+6. Main thread `join()`s the 3 scripted workers.
+7. Brief sleep (500ms) to let the last events propagate through Mini Agents and the ws server.
+8. `ws_server` broadcasts `mesh.session.ended` with totals.
+9. Cancel the asyncio loop; exit.
+
+### 12.2 State-change signal convention
+
+Scripted agents emit `agent.state.changed` events **explicitly** by calling a helper (`mesh.signal.state(agent_id, new_state, current_task=...)`) that writes a tiny control record to `.agentmesh/agents/{id}/state.signal`. The Mini Agent's file watcher picks it up and broadcasts the WebSocket event. Mini Agents do not infer state from dictionary mutations.
+
+### 12.3 Cross-thread comms
+
+- asyncio loop ↔ worker threads: `asyncio.run_coroutine_threadsafe` for pushing events onto the ws_server's broadcast queue.
+- Worker threads write dict files; file watcher (running in the asyncio loop) detects changes via `watchdog`'s `PollingObserver` (cross-platform reliable).
+
+### 12.4 Integration test timing
+
+`mesh/tests/test_scenario.py` runs the full scenario once. Assertions are **loose on timing, strict on order + count**:
+
+- `events = [e for e in session.jsonl]` — list all emitted events
+- Assert `[e.event for e in events]` matches a golden ordered list of event type names
+- Assert per-event-type counts match (e.g., exactly 1 `conflict.detected`, exactly 1 `conflict.resolved`, 4+ `message.sent`)
+- Assert final dictionary JSON blobs match exactly (byte-for-byte) the targets in DEMO_SCENARIO.md
+- Do NOT assert on `ts` fields or exact `seq` numbers — OS scheduling causes jitter
+
+## 13. References
 
 - [WEBSOCKET_SCHEMA.md](WEBSOCKET_SCHEMA.md) — event contract
-- [DEMO_SCENARIO.md](DEMO_SCENARIO.md) — 90-second scenario
+- [DEMO_SCENARIO.md](DEMO_SCENARIO.md) — scenario timeline
 - Full spec: team's internal `AgentMesh_System_Architecture.md` (not committed to this repo)
