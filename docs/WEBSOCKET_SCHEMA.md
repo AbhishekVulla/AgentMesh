@@ -1,7 +1,12 @@
-# AgentMesh WebSocket Event Schema (v1.0)
+# AgentMesh WebSocket Event Schema
 
-> **This is the hard contract between P1 (Python backend) and P2 (VS Code extension).**
-> Lock this document on Day 1 Hour 1. Any change after that requires explicit sync between both owners.
+> **Canonical source of truth:** [`mesh/schemas/events.py`](../mesh/schemas/events.py) (pydantic v2) → [`mesh/schemas/events.schema.json`](../mesh/schemas/events.schema.json) (JSON Schema generated from it).
+>
+> **Version:** v1.1 (flat envelope, UPPERCASE agent states). Superseded v1.0 (enveloped `{data: {...}}` + lowercase states) after P1+P2 schema sync resolved `docs/SYNC_NEEDED_SCHEMA.md` on 2026-04-21.
+>
+> TypeScript mirrors live at [`extension/src/types/events.ts`](../extension/src/types/events.ts) and [`extension/webview-ui/src/types/events.ts`](../extension/webview-ui/src/types/events.ts). These must stay in sync with the pydantic models — any field change requires a `sync-needed:` commit and both owners' sign-off.
+>
+> The sections below remain useful as a high-level narrative but **the pydantic models are authoritative** for field names, types, and validation rules.
 
 ## Connection
 
