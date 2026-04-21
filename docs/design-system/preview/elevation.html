@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Elevation</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 28px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+  .t { background: var(--am-bg-card); border: 1px solid var(--am-border); height: 92px; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px; }
+  .name { font-family: var(--am-font-mono); font-size: 10px; color: var(--am-fg-muted); letter-spacing: .06em; text-transform: uppercase; }
+  .use { font-size: 11px; color: var(--am-fg-subtle); line-height: 1.4; }
+</style></head>
+<body><div class="wrap">
+  <div class="t" style="box-shadow: var(--am-shadow-xs)"><span class="name">xs</span><span class="use">Inline chips</span></div>
+  <div class="t" style="box-shadow: var(--am-shadow-sm)"><span class="name">sm</span><span class="use">Buttons, tooltip</span></div>
+  <div class="t" style="box-shadow: var(--am-shadow-md)"><span class="name">md</span><span class="use">Dropdown, popover</span></div>
+  <div class="t" style="box-shadow: var(--am-shadow-lg)"><span class="name">lg</span><span class="use">Modal, command bar</span></div>
+  <div class="t" style="box-shadow: var(--am-shadow-glow); border-color: var(--am-mint-400)"><span class="name" style="color:var(--am-mint-300)">glow</span><span class="use">Focused node only</span></div>
+</div></body></html>

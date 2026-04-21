@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Typography — Display & headings</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .row { display: grid; grid-template-columns: 90px 1fr; gap: 20px; align-items: baseline; }
+  .meta { font-family: var(--am-font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--am-fg-subtle); padding-top: 10px; }
+  .spec { color: var(--am-fg); }
+</style></head>
+<body><div class="wrap">
+  <div class="row"><span class="meta">Display 88</span><span class="am-display spec">Spin up the mesh.</span></div>
+  <div class="row"><span class="meta">H1 · 44</span><span class="spec"><h1 style="margin:0">Six agents. One mesh.</h1></span></div>
+  <div class="row"><span class="meta">H2 · 26</span><span class="spec"><h2 style="margin:0">Active agents</h2></span></div>
+  <div class="row"><span class="meta">H3 · 20</span><span class="spec"><h3 style="margin:0">Session diagnostics</h3></span></div>
+  <div class="row"><span class="meta">H4 · 16</span><span class="spec"><h4 style="margin:0">Recent turns</h4></span></div>
+</div></body></html>

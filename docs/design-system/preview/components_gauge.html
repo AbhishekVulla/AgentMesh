@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Context gauge</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+  .row { display: grid; grid-template-columns: 80px 1fr 90px; align-items: center; gap: 14px; }
+  .lbl { font-family: var(--am-font-mono); font-size: 11px; color: var(--am-fg-muted); }
+  .num { font-family: var(--am-font-mono); font-size: 11px; color: var(--am-fg); text-align: right; font-variant-numeric: tabular-nums; }
+  .track { height: 6px; border-radius: 999px; background: var(--am-ink-200); overflow: hidden; position: relative; }
+  .fill { height: 100%; border-radius: 999px; }
+  .ok { background: linear-gradient(90deg, #12b477, #1fd08a); }
+  .warn { background: linear-gradient(90deg, #0c8f5e, #f5b84c); }
+  .danger { background: linear-gradient(90deg, #f5b84c, #ff8d14); }
+  .crit { background: linear-gradient(90deg, #ff8d14, #ff5d6b); }
+</style></head>
+<body><div class="wrap">
+  <div class="row"><span class="lbl">agent-1</span><div class="track"><div class="fill ok" style="width:22%"></div></div><span class="num">44K / 200K</span></div>
+  <div class="row"><span class="lbl">agent-2</span><div class="track"><div class="fill ok" style="width:46%"></div></div><span class="num">92K / 200K</span></div>
+  <div class="row"><span class="lbl">agent-3</span><div class="track"><div class="fill warn" style="width:68%"></div></div><span class="num">136K / 200K</span></div>
+  <div class="row"><span class="lbl">agent-4</span><div class="track"><div class="fill danger" style="width:84%"></div></div><span class="num">168K / 200K</span></div>
+  <div class="row"><span class="lbl">agent-5</span><div class="track"><div class="fill crit" style="width:97%"></div></div><span class="num">194K / 200K</span></div>
+</div></body></html>
