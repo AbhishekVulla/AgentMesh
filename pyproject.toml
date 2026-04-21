@@ -38,7 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-agentmesh = "mesh.run:main"
+agentmesh = "mesh.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/AbhishekVulla/AgentMesh"

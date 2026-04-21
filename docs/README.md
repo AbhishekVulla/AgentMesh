@@ -73,19 +73,66 @@ AgentMesh is infrastructure-first: **file-as-interface, minimum viable context, 
 - [docs/P1_KICKOFF.md](docs/P1_KICKOFF.md) — Claude Code kickoff prompt for Ishaan (P1, backend)
 - [docs/P2_KICKOFF.md](docs/P2_KICKOFF.md) — Claude Code kickoff prompt for Abhi (P2, extension)
 
-## Quickstart (when built)
+## Install
 
 ```bash
-# Terminal 1 — start the protocol backend
-cd mesh
-python -m mesh.run --config ../demo/config.yaml
-
-# Terminal 2 — run the demo scenario
-python demo/run_scenario.py
-
-# VS Code — open the workspace, F5 to launch the extension dev host
-# The extension connects to ws://localhost:9900 and shows the live session.
+pip install -e .
 ```
+
+This exposes a single console script, `agentmesh`, plus the `mesh` Python package.
+
+## Quickstart
+
+```bash
+# 1. Bus + static overlay server + browser tab, all in one command.
+agentmesh up
+
+# 2. In a second terminal, drive the packaged demo timeline against the bus.
+agentmesh scenario
+
+# 3. At any point, ask the bus what it has seen.
+agentmesh status
+```
+
+The overlay is live at `http://localhost:5173/overlay/`. The bus speaks
+WebSocket on `ws://localhost:9900` — any extension, notebook, or script
+that speaks the event schema (see [docs/WEBSOCKET_SCHEMA.md](WEBSOCKET_SCHEMA.md)) can attach.
+
+## CLI
+
+| Command | What it does |
+| --- | --- |
+| `agentmesh up` | Bus + overlay HTTP server in one process; opens the browser. |
+| `agentmesh bus` | Just the WebSocket bus on `:9900`. |
+| `agentmesh serve` | Just the static HTTP server for `overlay/`. |
+| `agentmesh attach --agent-id <id>` | Register a major agent and block — seeds `dictionary.json`, prints inbound messages. |
+| `agentmesh emit --agent-id <id> --set path=<json>` | One-shot dictionary mutation from the shell. Supports `--unset path`. |
+| `agentmesh scenario` | Drive the packaged DEMO_SCENARIO timeline. |
+| `agentmesh status` | Bus/HTTP liveness + session.jsonl event totals. |
+
+All paths use dot-notation with URL segments preserved:
+`routes./api/users.auth_required=true`.
+
+## Library usage
+
+```python
+from mesh.client import AgentMeshClient
+
+client = AgentMeshClient(agent_id="backend")
+client.register(role="backend")
+client.set("routes./api/users.auth_required", True)
+for msg in client.drain_input():
+    print(msg["from"], msg["scope"], msg["changes"])
+```
+
+The client writes to `.agentmesh/agents/<agent_id>/` using the same atomic
+`os.replace` pattern the bus' Mini Agent watches for. No WebSocket needed on
+the caller side.
+
+## VS Code extension
+
+Open the workspace, press F5 to launch the extension dev host. The
+extension connects to `ws://localhost:9900` automatically.
 
 ## Credits
 
