@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / VS Code extension
+node_modules/
+*.vsix
+out/
+dist/
+.vscode-test/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# AgentMesh runtime artifacts (generated during demo)
+.agentmesh/
+*.log
+*.tmp
+
+# Env / secrets
+.env
+.env.local
+*.pem
