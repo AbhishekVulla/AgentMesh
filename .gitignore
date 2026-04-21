@@ -2,36 +2,40 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info/
-.pytest_cache/
+*.so
+.Python
 .venv/
 venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Editor
+# Node / VS Code extension
+node_modules/
+*.vsix
+out/
+dist/
+.vscode-test/
+
+# Editor / OS
 .vscode/
 .idea/
-.claude/
-
-# OS
+*.swp
 .DS_Store
 Thumbs.db
 
-# AgentMesh runtime state (ephemeral per session) — but keep STATUS.md
-.agentmesh/agents/
-.agentmesh/events/
-!.agentmesh/STATUS.md
+# AgentMesh runtime artifacts (generated during demo)
+.agentmesh/
+*.log
+*.tmp
 
-# Build artifacts
-dist/
-build/
-*.tgz
-
-# Node (P2 extension)
-extension/node_modules/
-extension/out/
-extension/webview-ui/dist/
-extension/webview-ui/node_modules/
-
-# Env
+# Env / secrets
 .env
 .env.local
+*.pem

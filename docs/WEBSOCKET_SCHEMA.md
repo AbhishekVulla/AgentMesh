@@ -1,196 +1,253 @@
-# WebSocket Event Schema (G1 contract)
+# AgentMesh WebSocket Event Schema (v1.0)
 
-> **This document is frozen after Gate G1** (Day 1, first 60 min). Schema changes after that require an explicit P1+P2 sync (commit subject prefix `sync-needed:` plus Discord/iMessage).
+> **This is the hard contract between P1 (Python backend) and P2 (VS Code extension).**
+> Lock this document on Day 1 Hour 1. Any change after that requires explicit sync between both owners.
 
-Protocol: JSON-over-WebSocket on `ws://localhost:9900`. One event per WebSocket frame. Every event is simultaneously tee'd to `.agentmesh/events/session.jsonl` (one line per event) for replay.
+## Connection
 
-## Common envelope
+- URL: `ws://localhost:9900`
+- Protocol: WebSocket (RFC 6455)
+- Wire format: UTF-8 JSON, one event per message frame
+- Server: P1 (`mesh/ws_server.py`)
+- Client: P2 (extension `src/ws_client.ts`, overlay webview consumes via `postMessage`)
+- Reconnection: client reconnects on drop with exponential backoff (1s, 2s, 4s, max 8s)
+- The server tees every event to `.agentmesh/events/session.jsonl` for replay / tests
 
-Every event has these fields:
-
-| Field | Type | Description |
-|---|---|---|
-| `event` | string (literal) | Event type discriminator. Must be one of the `event` values below. |
-| `seq` | int | Monotonically increasing per-session sequence number, starting at 0. |
-| `ts` | string (ISO-8601 UTC) | Wall-clock timestamp, e.g. `"2026-04-21T10:30:00.123Z"`. |
-| `session_id` | string | Stable ID for the current session (UUID4). |
-
-Additional fields depend on the event type (below).
-
-## Event types (complete list — 9)
-
-All examples omit the common envelope for brevity; assume `event`, `seq`, `ts`, `session_id` are always present.
-
----
-
-### 1. `mesh.session.started`
-
-Emitted exactly once at the start of the WebSocket server's lifecycle, after all Mini Agents have registered.
-
-```json
-{
-  "event": "mesh.session.started",
-  "agents": [
-    { "id": "backend",  "role": "Backend API",       "exposes": ["routes.*", "models.*", "auth.*"] },
-    { "id": "frontend", "role": "Frontend UI",       "exposes": ["api_calls.*"] },
-    { "id": "database", "role": "Database schema",   "exposes": ["schema.*"] }
-  ],
-  "config_path": "demo/config.yaml"
-}
-```
-
-### 2. `mesh.session.ended`
-
-Final event. Clients should close after receiving this.
-
-```json
-{
-  "event": "mesh.session.ended",
-  "reason": "completed",
-  "totals": {
-    "events_emitted": 42,
-    "messages_routed": 4,
-    "conflicts": 1,
-    "bytes_exchanged": 1280,
-    "duration_ms": 26000
-  }
-}
-```
-
-`reason` ∈ `"completed"` | `"aborted"` | `"error"`.
-
-### 3. `agent.state.changed`
-
-An agent transitioned state.
+## Event envelope (all events share these fields)
 
 ```json
 {
   "event": "agent.state.changed",
-  "agent_id": "backend",
-  "from": "IDLE",
-  "to": "WORKING",
-  "current_task": "Adding /api/users route"
+  "v": "1.0",
+  "seq": 42,
+  "ts": "2026-04-21T10:30:15.123Z",
+  "session_id": "sess-20260421-103015",
+  "data": { ... event-specific payload ... }
 }
 ```
 
-States: `"IDLE"` | `"WORKING"` | `"BLOCKED"` | `"COMPLETED"`.
+- `event`: event type string (see table below)
+- `v`: schema version — `"1.0"` for this spec
+- `seq`: monotonic per-session sequence number starting at 1
+- `ts`: ISO 8601 UTC with millisecond precision
+- `session_id`: stable for the lifetime of one AgentMesh run
+- `data`: event-specific payload, structure defined per event below
 
-### 4. `dict.mutated`
+## Event types (complete list)
 
-An agent's dictionary was mutated. Payload carries the full diff (not the full dict).
+| Event | When emitted | Payload section |
+|---|---|---|
+| `mesh.session.started` | First thing after WebSocket server starts | §1 |
+| `mesh.session.ended` | Last thing before server shuts down | §2 |
+| `agent.state.changed` | A Mini Agent transitions IDLE ↔ WORKING ↔ BLOCKED ↔ COMPLETED | §3 |
+| `dict.mutated` | An agent's `dictionary.json` changed | §4 |
+| `message.sent` | A Mini Agent wrote a message to a peer's `input.json` | §5 |
+| `message.delivered` | Target Mini Agent processed a message from its queue | §6 |
+| `conflict.detected` | Conflict Detector flagged incompatible changes | §7 |
+| `conflict.resolved` | Priority table picked a winner, loser notified | §8 |
+| `metrics.tick` | 1 Hz heartbeat with running counters | §9 |
+
+## §1 `mesh.session.started`
+
+```json
+{
+  "event": "mesh.session.started",
+  "v": "1.0", "seq": 1, "ts": "2026-04-21T10:30:00.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "agents": [
+      { "id": "backend",  "domain": "backend",  "display_name": "Backend" },
+      { "id": "frontend", "domain": "frontend", "display_name": "Frontend" },
+      { "id": "database", "domain": "database", "display_name": "Database" }
+    ],
+    "dependency_map_hash": "sha256:abc123..."
+  }
+}
+```
+
+## §2 `mesh.session.ended`
+
+```json
+{
+  "event": "mesh.session.ended",
+  "v": "1.0", "seq": 999, "ts": "2026-04-21T10:31:30.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "duration_ms": 90000,
+    "totals": {
+      "messages": 4,
+      "conflicts_detected": 1,
+      "conflicts_resolved": 1,
+      "dict_mutations": 8,
+      "bytes_exchanged": 4820,
+      "estimated_tokens_saved_pct": 0.68
+    }
+  }
+}
+```
+
+## §3 `agent.state.changed`
+
+```json
+{
+  "event": "agent.state.changed",
+  "v": "1.0", "seq": 2, "ts": "2026-04-21T10:30:05.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "agent_id": "database",
+    "old_state": "idle",
+    "new_state": "working",
+    "current_task": "Adding users table schema"
+  }
+}
+```
+
+States: `"idle" | "working" | "blocked" | "completed"`.
+
+## §4 `dict.mutated`
 
 ```json
 {
   "event": "dict.mutated",
-  "agent_id": "backend",
-  "version": 3,
-  "changes": [
-    {
-      "path": "backend.routes./api/users",
-      "op":   "add",
-      "old":  null,
-      "new":  { "method": "GET", "auth_required": true }
-    }
-  ]
+  "v": "1.0", "seq": 3, "ts": "2026-04-21T10:30:06.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "agent_id": "database",
+    "version_from": 0,
+    "version_to": 1,
+    "changes": [
+      {
+        "path": "database.schema.users.columns",
+        "op": "add",
+        "old": null,
+        "new": ["id", "name", "email"]
+      }
+    ]
+  }
 }
 ```
 
-`op` ∈ `"add"` | `"modify"` | `"delete"`. For `"add"`, `old` is `null`. For `"delete"`, `new` is `null`. `path` segments preserve verbatim (slashes inside route paths are OK — the parser uses a tokenizer, not a naive `split(".")`).
+- `op`: `"add" | "modify" | "delete"`
+- `path`: dot-separated, with route paths preserved verbatim (e.g. `backend.routes./api/users.auth_required`)
 
-### 5. `message.sent`
-
-A Mini Agent routed a message to a peer via `input.json`.
+## §5 `message.sent`
 
 ```json
 {
   "event": "message.sent",
-  "message_id": "msg-20260421-backend-001",
-  "from": "backend",
-  "to":   "frontend",
-  "scope": "backend.routes./api/users",
-  "diff_summary": { "paths_changed": 1, "bytes": 156 },
-  "priority": "normal",
-  "correlation_id": null
+  "v": "1.0", "seq": 4, "ts": "2026-04-21T10:30:07.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "message_id": "msg-20260421-database-001",
+    "from": "database",
+    "to": "backend",
+    "type": "state_update",
+    "priority": "normal",
+    "scope": "database.schema.users",
+    "summary": "Database added users table with columns [id, name, email]",
+    "size_bytes": 420
+  }
 }
 ```
 
-`priority` ∈ `"low"` | `"normal"` | `"high"`. `correlation_id` is set on responses (e.g. conflict resolutions); otherwise `null`.
+- `type`: `"state_update" | "request" | "response" | "signal"`
+- `priority`: `"blocking" | "high" | "normal" | "low"`
 
-### 6. `message.delivered`
-
-The target Mini Agent read the message from its `input.json`.
+## §6 `message.delivered`
 
 ```json
 {
   "event": "message.delivered",
-  "message_id": "msg-20260421-backend-001",
-  "from": "backend",
-  "to":   "frontend",
-  "latency_ms": 42
+  "v": "1.0", "seq": 5, "ts": "2026-04-21T10:30:08.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "message_id": "msg-20260421-database-001",
+    "to": "backend",
+    "processing_ms": 42
+  }
 }
 ```
 
-### 7. `conflict.detected`
-
-The incoming scope collides with the target's own dictionary.
+## §7 `conflict.detected`
 
 ```json
 {
   "event": "conflict.detected",
-  "conflict_id": "cf-20260421-001",
-  "path": "backend.routes./api/users.auth_required",
-  "parties": [
-    { "agent_id": "backend",  "value": true  },
-    { "agent_id": "frontend", "value": false }
-  ],
-  "incoming_message_id": "msg-20260421-frontend-003"
+  "v": "1.0", "seq": 6, "ts": "2026-04-21T10:30:45.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "conflict_id": "conf-001",
+    "key_path": "backend.routes./api/users.auth_required",
+    "agents": ["backend", "frontend"],
+    "values": {
+      "backend":  { "value": true,  "version": 4, "reason": "Security — protect PII" },
+      "frontend": { "value": false, "version": 2, "reason": "Built call without auth header" }
+    },
+    "strategy": "priority_table"
+  }
 }
 ```
 
-### 8. `conflict.resolved`
-
-Priority table picked a winner.
+## §8 `conflict.resolved`
 
 ```json
 {
   "event": "conflict.resolved",
-  "conflict_id": "cf-20260421-001",
-  "winner": "backend",
-  "loser": "frontend",
-  "reason": "route_auth_changes priority table: backend > frontend > database",
-  "resolution_message_id": "msg-20260421-backend-004"
+  "v": "1.0", "seq": 7, "ts": "2026-04-21T10:30:46.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "conflict_id": "conf-001",
+    "winner": "backend",
+    "loser":  "frontend",
+    "applied_value": true,
+    "follow_up_message_id": "msg-20260421-resolver-002",
+    "rationale": "Priority table: backend > frontend on route_auth_changes"
+  }
 }
 ```
 
-### 9. `metrics.tick`
+## §9 `metrics.tick`
 
-Emitted at ~1 Hz, or on significant state change, whichever is sooner. Drives the metrics bar in the overlay.
+Emitted at 1 Hz during an active session. Purely for the overlay's counter animations.
 
 ```json
 {
   "event": "metrics.tick",
-  "messages_total": 4,
-  "conflicts_total": 1,
-  "bytes_exchanged_total": 1280,
-  "estimated_tokens_saved_pct": 78.5
+  "v": "1.0", "seq": 50, "ts": "2026-04-21T10:30:50.000Z",
+  "session_id": "sess-20260421-103000",
+  "data": {
+    "messages_sent": 3,
+    "messages_delivered": 3,
+    "conflicts_open": 0,
+    "conflicts_resolved_total": 1,
+    "dict_mutations_total": 5,
+    "bytes_exchanged": 2140,
+    "estimated_tokens_saved_pct": 0.64
+  }
 }
 ```
 
-`estimated_tokens_saved_pct` is a rough heuristic: `1 - (bytes routed / bytes if full context had been passed)`. Shown as a % float, two decimals.
+`estimated_tokens_saved_pct` is a simple model: sum of bytes in filtered diffs (what AgentMesh transmits) vs. sum of bytes in full-context transfers that would be needed without path-filtered subscriptions (naive baseline = full dictionary size × number of recipients). Formula documented in `mesh/metrics.py`.
 
----
+## Error handling
 
-## Field notes and constraints
+- On malformed JSON from server: client logs, stays connected, skips the frame.
+- On unknown `event` type: client logs warning, skips (forward-compat).
+- On missing required field: client logs error and continues.
+- Server never closes the connection except during shutdown; all errors are logged server-side.
 
-- **Timestamps**: always UTC, always ISO-8601 with millisecond precision, always suffixed `Z`. No offsets.
-- **Sequence numbers**: start at 0, strictly increasing, gap-free within a session.
-- **Agent IDs**: lowercase, kebab-allowed, no spaces. MVP uses exactly `"backend"`, `"frontend"`, `"database"`.
-- **Paths**: see §4 above — `.` is the separator; route/URL slashes are part of the segment. Example: `backend.routes./api/users.method` has segments `["backend", "routes", "/api/users", "method"]`.
-- **Byte counts**: UTF-8 encoded JSON byte length of the message payload (excluding envelope).
-- **Versions**: per-agent monotonic ints; reset to 1 on session start.
+## Schema validation
 
-## pydantic generation
+P1 owns the authoritative JSON Schema at `mesh/schemas/events.schema.json` (generated from pydantic models). P2 runs the same schema through `ajv` on the client for debug assertions.
 
-The authoritative schema lives in [`mesh/schemas/events.py`](../mesh/schemas/events.py) (pydantic v2 `BaseModel`s with a discriminated union). A JSON Schema is generated via `pydantic.TypeAdapter(Event).json_schema()` and committed to `mesh/schemas/events.schema.json` for P2's TypeScript side to consume.
+**Any field change requires updating:**
+1. pydantic model in `mesh/schemas/events.py`
+2. Regenerated JSON Schema in `mesh/schemas/events.schema.json`
+3. TypeScript types in `extension/src/types/events.ts` (mirror the pydantic model)
+4. This document
 
-**If pydantic and this doc disagree, pydantic wins** (because P2's types are generated from it). File a `sync-needed:` commit if you spot a divergence.
+## Versioning
+
+Bump `v` to `1.1`, `2.0`, etc. on any breaking change. Non-breaking (additive) changes increment the minor.
+
+For the hackathon, `v: "1.0"` is frozen. Don't change the wire format after Day 1 Hour 1.
