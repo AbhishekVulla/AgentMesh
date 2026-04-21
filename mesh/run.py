@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import signal
 import sys
 import uuid
@@ -52,6 +53,8 @@ class Session:
         self._metrics_messages = 0
         self._metrics_conflicts = 0
         self._stop = asyncio.Event()
+        self._last_states: dict[str, str] = {}
+        self._summary_mtimes: dict[str, float] = {}
 
     async def start(self) -> None:
         await self.bus.start()
@@ -129,6 +132,7 @@ class Session:
                         if prev != 0.0:
                             await ma.on_dictionary_changed()
                     await ma.drain_input()
+                    await self._poll_summary(ma)
                 await self.emit_tick()
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=1.0)
@@ -137,6 +141,39 @@ class Session:
                 tick += 1
         finally:
             await self.end("completed")
+
+    async def _poll_summary(self, ma: MiniAgent) -> None:
+        """Watch summary.json for state flips and emit agent.state.changed."""
+        sj = ma.agent_dir / "summary.json"
+        try:
+            m = sj.stat().st_mtime
+        except FileNotFoundError:
+            return
+        prev = self._summary_mtimes.get(ma.agent_id, 0.0)
+        if m == prev:
+            return
+        self._summary_mtimes[ma.agent_id] = m
+        try:
+            with sj.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return
+        new_state = str(data.get("state", "")).upper() or "IDLE"
+        if new_state not in {"IDLE", "WORKING", "BLOCKED", "COMPLETED"}:
+            return
+        old_state = self._last_states.get(ma.agent_id, "IDLE")
+        if new_state == old_state:
+            return
+        self._last_states[ma.agent_id] = new_state
+        await self.bus.broadcast(
+            {
+                "event": "agent.state.changed",
+                "agent_id": ma.agent_id,
+                "from": old_state,
+                "to": new_state,
+                "current_task": data.get("current_task"),
+            }
+        )
 
     async def end(self, reason: str) -> None:
         await self.bus.broadcast(

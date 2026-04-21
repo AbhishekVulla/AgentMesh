@@ -1,15 +1,14 @@
-"""Drive the DEMO_SCENARIO timeline by writing dictionary.json files.
+"""Drive the DEMO_SCENARIO.md timeline by mutating dictionary.json files.
 
-Run `python -m mesh.run --config demo/config.yaml` in one terminal, then
-this script in another. The Mini Agents watch dictionary.json mtime and
-emit the wire events live to every WebSocket client (including the
-overlay at overlay/index.html).
+Run `python -m mesh.run --config demo/config.yaml` in one terminal first;
+this script pumps the 26-second timeline against the running bus from a
+second terminal. The Mini Agents watch dictionary.json mtime, diff,
+route, and fire the Type B rule when backend promotes auth_required.
 
 No LLM calls. Every action is a dictionary mutation or a state flip.
 """
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 
@@ -26,8 +25,6 @@ def write_dict(agent: str, data: dict) -> None:
 
 
 def write_state(agent: str, state: str, current_task: str = "") -> None:
-    """Emit an agent.state.changed by updating summary.json (bus picks it up
-    via the session loop's input drain — for MVP we just print + sleep)."""
     path = ROOT / agent / "summary.json"
     atomic_write_json(path, {"state": state, "current_task": current_task})
     print(f"[{agent}] -> {state} {current_task}")
@@ -36,60 +33,78 @@ def write_state(agent: str, state: str, current_task: str = "") -> None:
 def main() -> int:
     for a in ("backend", "frontend", "database"):
         (ROOT / a).mkdir(parents=True, exist_ok=True)
-        # Start from empty dictionary for determinism.
-        atomic_write_json(ROOT / a / "dictionary.json",
-                          {"_meta": {"agent_id": a, "version": 0}})
+        atomic_write_json(
+            ROOT / a / "dictionary.json",
+            {"_meta": {"agent_id": a, "version": 0}},
+        )
         atomic_write_json(ROOT / a / "input.json", {"queue": []})
 
     print("[demo] scenario start — three agents on disk")
     time.sleep(1.0)
 
-    # T+2.0 database defines schema
+    # T+1 database -> WORKING
     write_state("database", "WORKING", "Defining users schema")
-    write_dict("database", {
-        "database": {"schema": {"users": {"columns": ["id", "name", "email", "created_at"]}}},
-    })
-    time.sleep(3.0)
+    time.sleep(1.0)
 
-    # T+6.0 backend aligns User model
-    write_state("backend", "WORKING", "Aligning User model")
-    write_dict("backend", {
-        "backend": {"models": {"User": {"fields": {
-            "id": "int", "name": "string", "email": "string", "created_at": "datetime"}}}},
+    # T+2 database defines schema
+    write_dict("database", {
+        "database": {"schema": {"users": {
+            "columns": ["id", "name", "email", "created_at"],
+        }}},
     })
     time.sleep(2.0)
 
-    # T+8.0 backend adds GET /api/users route, auth-less
+    # T+4 backend -> WORKING
+    write_state("backend", "WORKING", "Aligning User model")
+    time.sleep(2.0)
+
+    # T+6 backend aligns User model
+    write_dict("backend", {
+        "backend": {"models": {"User": {"fields": {
+            "id": "int", "name": "string", "email": "string",
+            "created_at": "datetime",
+        }}}},
+    })
+    time.sleep(2.0)
+
+    # T+8 backend adds GET /api/users route (auth-less initially)
     write_dict("backend", {
         "backend": {
             "models": {"User": {"fields": {
-                "id": "int", "name": "string", "email": "string", "created_at": "datetime"}}},
+                "id": "int", "name": "string", "email": "string",
+                "created_at": "datetime",
+            }}},
             "routes": {"/api/users": {"method": "GET", "auth_required": False}},
         },
     })
-    time.sleep(3.0)
+    time.sleep(2.0)
 
-    # T+12.0 frontend adds API call without Authorization header
-    # Also records its expectation that the route is auth-less; this
-    # expectation is what makes the backend's later flip a real conflict.
+    # T+10 frontend -> WORKING
     write_state("frontend", "WORKING", "Wiring /api/users call")
+    time.sleep(2.0)
+
+    # T+12 frontend adds api_calls with empty headers. Deliberately NO
+    # Authorization — this is what makes the Type B rule fire later.
     write_dict("frontend", {
-        "frontend": {"api_calls": {"/api/users": {"method": "GET", "headers": {}}}},
-        "backend": {"routes": {"/api/users": {"auth_required": False}}},
+        "frontend": {"api_calls": {"/api/users": {
+            "method": "GET", "headers": {},
+        }}},
     })
     time.sleep(3.0)
 
-    # T+15.0 backend security-promotes the route
+    # T+15 backend security-promotes the route (Type B trigger)
     write_dict("backend", {
         "backend": {
             "models": {"User": {"fields": {
-                "id": "int", "name": "string", "email": "string", "created_at": "datetime"}}},
+                "id": "int", "name": "string", "email": "string",
+                "created_at": "datetime",
+            }}},
             "routes": {"/api/users": {"method": "GET", "auth_required": True}},
         },
     })
-    time.sleep(4.0)
+    time.sleep(5.0)
 
-    # T+20.0 frontend applies resolution: auth header
+    # T+20 frontend applies the resolution: adds the Authorization header.
     write_dict("frontend", {
         "frontend": {"api_calls": {"/api/users": {
             "method": "GET",
@@ -98,9 +113,18 @@ def main() -> int:
     })
     time.sleep(2.0)
 
+    # T+22 backend -> COMPLETED
     write_state("backend", "COMPLETED")
+    time.sleep(2.0)
+
+    # T+24 database -> COMPLETED
     write_state("database", "COMPLETED")
+    time.sleep(1.0)
+
+    # T+25 frontend -> COMPLETED
     write_state("frontend", "COMPLETED")
+    time.sleep(1.0)
+
     print("[demo] scenario complete")
     return 0
 

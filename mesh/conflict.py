@@ -1,6 +1,16 @@
-"""Priority-table-driven conflict resolver. Deterministic. No LLM.
+"""Dual-mechanism, deterministic conflict resolver. No LLM.
 
-docs/ARCHITECTURE.md §7:
+docs/ARCHITECTURE.md §7 specifies two kinds of conflict:
+
+- Type A (direct path collision): two agents wrote to the same dot-path
+  with different values. Resolved via the priority table below.
+- Type B (semantic cross-reference): different paths, but a declared rule
+  says they must be kept consistent. The demo's hero conflict is Type B
+  (`backend.routes.*.auth_required=true` requires a matching
+  `frontend.api_calls.*.headers.Authorization`). Rules live in this file
+  as frozen dataclasses.
+
+Priority table categories:
 
     route_auth_changes:   [backend, frontend, database]
     schema_changes:       [database, backend, frontend]
@@ -10,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -42,6 +52,56 @@ class Resolution:
     loser: str
     reason: str
     resolution_message_id: str
+
+
+@dataclass(frozen=True)
+class ConflictRule:
+    """Type B rule: trigger path on one agent requires a peer path on another.
+
+    `trigger_path_glob` uses `*` for a single segment (segment-aware,
+    driven by `tokenize_dotpath`). Each `*` captures a value; the first
+    capture is bound to `{route}` in templates for the demo rule.
+    `required_peer_path_template` uses `{route}` placeholder.
+    """
+
+    id: str
+    trigger_agent: str
+    trigger_path_glob: str
+    trigger_value_predicate: Callable[[Any], bool]
+    required_peer_agent: str
+    required_peer_path_template: str
+    winner: str
+    resolution_message: str
+
+
+@dataclass(frozen=True)
+class RuleMatch:
+    """One Type B rule firing, after predicate + peer-lookup both pass."""
+
+    rule: ConflictRule
+    trigger_path: str
+    trigger_value: Any
+    captured: dict[str, Any]
+    required_peer_path: str
+    peer_has_required: bool
+    resolution_message: str
+
+
+RULES: list[ConflictRule] = [
+    ConflictRule(
+        id="auth_required_on_route",
+        trigger_agent="backend",
+        trigger_path_glob="routes.*.auth_required",
+        trigger_value_predicate=lambda v: v is True,
+        required_peer_agent="frontend",
+        required_peer_path_template="api_calls.{route}.headers.Authorization",
+        winner="backend",
+        resolution_message=(
+            "Backend route {route} now requires authentication. "
+            "Add Authorization header to api_calls.{route}."
+        ),
+    ),
+]
 
 
 class ConflictResolver:
@@ -116,3 +176,90 @@ def _rule_matches(rule: list[str], path_segs: list[str]) -> bool:
         if token == "*" or token == seg:
             i += 1
     return i == len(rule)
+
+
+def _strip_agent_prefix(path: str, agent_id: str) -> str:
+    segs = tokenize_dotpath(path)
+    if segs and segs[0] == agent_id:
+        segs = segs[1:]
+    return ".".join(segs)
+
+
+def _glob_match(glob: str, path: str) -> list[str] | None:
+    """Segment-aware wildcard match. Returns captured segments at each `*`
+    position, or None if no match.
+
+    Example: `_glob_match("routes.*.auth_required",
+                          "routes./api/users.auth_required")` -> `["/api/users"]`.
+    """
+    g_segs = tokenize_dotpath(glob)
+    p_segs = tokenize_dotpath(path)
+    if len(g_segs) != len(p_segs):
+        return None
+    captured: list[str] = []
+    for g, p in zip(g_segs, p_segs):
+        if g == "*":
+            captured.append(p)
+        elif g != p:
+            return None
+    return captured
+
+
+def _path_exists(data: dict[str, Any], dotpath: str) -> bool:
+    segs = tokenize_dotpath(dotpath)
+    cur: Any = data
+    for seg in segs:
+        if not isinstance(cur, dict) or seg not in cur:
+            return False
+        cur = cur[seg]
+    return cur is not None
+
+
+def evaluate_rules(
+    trigger_agent: str,
+    change_path: str,
+    change_value: Any,
+    peer_dicts: dict[str, dict[str, Any]],
+    rules: list[ConflictRule] | None = None,
+) -> list[RuleMatch]:
+    """Check each Type B rule against a single outgoing change.
+
+    `change_path` is the full agent-qualified path (e.g.
+    `backend.routes./api/users.auth_required`). `peer_dicts` maps
+    agent_id -> that agent's current dictionary JSON (including its
+    own top-level agent_id key). Only rules where `peer_has_required`
+    is False are returned — those are the ones that actually fire.
+    """
+    rules = RULES if rules is None else rules
+    out: list[RuleMatch] = []
+    for rule in rules:
+        if rule.trigger_agent != trigger_agent:
+            continue
+        scoped_path = _strip_agent_prefix(change_path, trigger_agent)
+        captured = _glob_match(rule.trigger_path_glob, scoped_path)
+        if captured is None:
+            continue
+        if not rule.trigger_value_predicate(change_value):
+            continue
+        # Bind the first capture to `{route}`. Extend here if/when more
+        # rules need named captures.
+        binding = {"route": captured[0]} if captured else {}
+        required_peer_path = rule.required_peer_path_template.format(**binding)
+        peer_dict = peer_dicts.get(rule.required_peer_agent, {})
+        peer_scope = peer_dict.get(rule.required_peer_agent, {}) \
+            if isinstance(peer_dict, dict) else {}
+        peer_has = _path_exists(peer_scope, required_peer_path)
+        if peer_has:
+            continue  # rule condition satisfied -> no conflict
+        out.append(
+            RuleMatch(
+                rule=rule,
+                trigger_path=change_path,
+                trigger_value=change_value,
+                captured=binding,
+                required_peer_path=required_peer_path,
+                peer_has_required=peer_has,
+                resolution_message=rule.resolution_message.format(**binding),
+            )
+        )
+    return out

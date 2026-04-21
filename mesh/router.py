@@ -35,9 +35,16 @@ class Router:
             self._map = yaml.safe_load(f) or {}
 
     def route(self, from_agent: str, changes: list[Change]) -> list[RoutedDiff]:
+        """Fan a diff out to subscribers. Changes matching the same publish
+        pattern for the same target+priority are collapsed into a single
+        RoutedDiff whose `scope` is the longest common path prefix of the
+        grouped changes (segment-aware). This matches the mock-event shape
+        P2's overlay consumes: one message per subtree, not per leaf."""
         agent_cfg = self._map.get(from_agent, {}) or {}
         publishes: dict[str, Any] = agent_cfg.get("publishes", {}) or {}
-        by_target: dict[tuple[str, str, str], list[Change]] = {}
+        # Group by (target, publish_pattern, priority) first; compute the
+        # scope from the group's common prefix once all members are known.
+        by_group: dict[tuple[str, str, str], list[Change]] = {}
 
         for ch in changes:
             relative = _strip_agent_prefix(ch.path, from_agent)
@@ -46,15 +53,15 @@ class Router:
                     continue
                 priority = (rule or {}).get("priority", "normal")
                 targets = (rule or {}).get("notify", []) or []
-                scope = self._scope_for(pattern, relative, from_agent)
                 for target in targets:
-                    key = (target, scope, priority)
-                    by_target.setdefault(key, []).append(ch)
+                    key = (target, pattern, priority)
+                    by_group.setdefault(key, []).append(ch)
 
-        return [
-            RoutedDiff(target=t, scope=s, priority=p, changes=chs)
-            for (t, s, p), chs in by_target.items()
-        ]
+        out: list[RoutedDiff] = []
+        for (target, _pattern, priority), chs in by_group.items():
+            scope = _common_prefix_scope(chs, from_agent)
+            out.append(RoutedDiff(target=target, scope=scope, priority=priority, changes=chs))
+        return out
 
     def filter_diff_for(self, target_agent: str, changes: list[Change]) -> list[Change]:
         agent_cfg = self._map.get(target_agent, {}) or {}
@@ -111,3 +118,29 @@ def _strip_agent_prefix(path: str, agent: str) -> str:
     if segs and segs[0] == agent:
         segs = segs[1:]
     return ".".join(segs)
+
+
+def _common_prefix_scope(changes: list[Change], from_agent: str) -> str:
+    """Longest segment-wise common prefix across the grouped changes. For a
+    single change, use the change's path minus its leaf."""
+    if not changes:
+        return from_agent
+    all_segs = [tokenize_dotpath(c.path) for c in changes]
+    if len(all_segs) == 1:
+        segs = all_segs[0]
+        # drop the leaf for single-change case, so four `fields.id/name/...`
+        # all end up at `backend.models.User.fields` when grouped, but a
+        # single leaf change lands at its parent.
+        prefix = segs[:-1] if len(segs) > 1 else segs
+        return ".".join(prefix)
+    shortest = min(len(s) for s in all_segs)
+    prefix: list[str] = []
+    for i in range(shortest):
+        seg = all_segs[0][i]
+        if all(s[i] == seg for s in all_segs):
+            prefix.append(seg)
+        else:
+            break
+    if not prefix:
+        return from_agent
+    return ".".join(prefix)

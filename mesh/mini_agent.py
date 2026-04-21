@@ -20,7 +20,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from mesh.conflict import ConflictResolver
+from mesh.conflict import ConflictResolver, RuleMatch, evaluate_rules
 from mesh.dict_store import DictStore, atomic_write_json, tokenize_dotpath
 from mesh.diff_engine import Change, compute_diff
 from mesh.router import RoutedDiff, Router
@@ -91,6 +91,92 @@ class MiniAgent:
         routed = self.router.route(self.agent_id, changes)
         for rd in routed:
             await self._send(rd)
+
+        await self._evaluate_type_b(changes)
+
+    async def _evaluate_type_b(self, changes: list[Change]) -> None:
+        """Type B (§7.3): trigger path on self requires a peer path on another
+        agent. If the peer's path is missing, emit conflict.detected + resolved
+        and enqueue a `response` message to the peer's input.json."""
+        peer_dicts = _load_peer_dicts(self.peers)
+        for ch in changes:
+            if ch.op == "delete":
+                continue
+            matches = evaluate_rules(
+                trigger_agent=self.agent_id,
+                change_path=ch.path,
+                change_value=ch.new,
+                peer_dicts=peer_dicts,
+            )
+            for m in matches:
+                await self._fire_type_b(m)
+
+    async def _fire_type_b(self, m: RuleMatch) -> None:
+        rule = m.rule
+        conflict_id = f"cf-{uuid.uuid4().hex[:10]}"
+        await self.emit(
+            {
+                "event": "conflict.detected",
+                "conflict_id": conflict_id,
+                "path": m.trigger_path,
+                "parties": [
+                    {"agent_id": rule.trigger_agent, "value": m.trigger_value},
+                    {"agent_id": rule.required_peer_agent, "value": None},
+                ],
+                "incoming_message_id": f"rule:{rule.id}",
+            }
+        )
+        resolution_message_id = f"msg-{uuid.uuid4().hex[:12]}"
+        loser = (
+            rule.required_peer_agent
+            if rule.winner == rule.trigger_agent
+            else rule.trigger_agent
+        )
+        reason = (
+            f"Type B rule `{rule.id}`: {rule.required_peer_agent} missing "
+            f"{m.required_peer_path}"
+        )
+        await self.emit(
+            {
+                "event": "conflict.resolved",
+                "conflict_id": conflict_id,
+                "winner": rule.winner,
+                "loser": loser,
+                "reason": reason,
+                "resolution_message_id": resolution_message_id,
+            }
+        )
+        # Write a response-type message to the loser's input.json so its
+        # scripted agent can act on the resolution, and emit the matching
+        # message.sent so the overlay sees the courier.
+        peer_dir = self.peers.get(rule.required_peer_agent)
+        if peer_dir is not None:
+            payload = {
+                "message_id": resolution_message_id,
+                "from": self.agent_id,
+                "to": rule.required_peer_agent,
+                "type": "response",
+                "scope": m.trigger_path,
+                "changes": [],
+                "priority": "high",
+                "correlation_id": conflict_id,
+                "resolution_message": m.resolution_message,
+                "required_peer_path": m.required_peer_path,
+            }
+            _append_to_queue(peer_dir / "input.json", payload)
+            byte_size = len(json.dumps(payload).encode("utf-8"))
+            await self.emit(
+                {
+                    "event": "message.sent",
+                    "message_id": resolution_message_id,
+                    "from": self.agent_id,
+                    "to": rule.required_peer_agent,
+                    "scope": m.trigger_path,
+                    "diff_summary": {"paths_changed": 0, "bytes": byte_size},
+                    "priority": "high",
+                    "correlation_id": conflict_id,
+                }
+            )
 
     async def _send(self, rd: RoutedDiff) -> None:
         message_id = f"msg-{uuid.uuid4().hex[:12]}"
@@ -196,6 +282,24 @@ class MiniAgent:
 
 def _strip_meta(data: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in (data or {}).items() if k != "_meta"}
+
+
+def _load_peer_dicts(peers: dict[str, Path]) -> dict[str, dict[str, Any]]:
+    """Read each peer's dictionary.json. Missing files -> empty dict. The
+    returned shape matches the on-disk JSON (including the top-level
+    agent_id key), which is what `evaluate_rules` expects."""
+    out: dict[str, dict[str, Any]] = {}
+    for peer_id, peer_dir in peers.items():
+        path = peer_dir / "dictionary.json"
+        if not path.exists():
+            out[peer_id] = {}
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                out[peer_id] = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            out[peer_id] = {}
+    return out
 
 
 def _append_to_queue(path: Path, msg: dict[str, Any]) -> None:
