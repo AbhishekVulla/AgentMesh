@@ -1,39 +1,16 @@
-// TypeScript types mirroring docs/WEBSOCKET_SCHEMA.md v1.0.
-// Keep in sync with mesh/schemas/events.py. Manual mirror — no codegen in MVP.
+// TypeScript types mirroring mesh/schemas/events.py (pydantic v2).
+// Schema v1.1 — flat envelope, UPPERCASE agent states.
+// Authoritative source: https://github.com/AbhishekVulla/AgentMesh/blob/p1-backend/mesh/schemas/events.py
 
-export type AgentState = "idle" | "working" | "blocked" | "completed";
-export type MessageType = "state_update" | "request" | "response" | "signal";
-export type MessagePriority = "blocking" | "high" | "normal" | "low";
+export type AgentState = "IDLE" | "WORKING" | "BLOCKED" | "COMPLETED";
+export type MessagePriority = "low" | "normal" | "high";
 export type ChangeOp = "add" | "modify" | "delete";
+export type SessionEndReason = "completed" | "aborted" | "error";
 
 export interface AgentDescriptor {
   id: string;
-  domain: string;
-  display_name: string;
-}
-
-export interface SessionStartedData {
-  agents: AgentDescriptor[];
-  dependency_map_hash: string;
-}
-
-export interface SessionEndedData {
-  duration_ms: number;
-  totals: {
-    messages: number;
-    conflicts_detected: number;
-    conflicts_resolved: number;
-    dict_mutations: number;
-    bytes_exchanged: number;
-    estimated_tokens_saved_pct: number;
-  };
-}
-
-export interface AgentStateChangedData {
-  agent_id: string;
-  old_state: AgentState;
-  new_state: AgentState;
-  current_task?: string;
+  role: string;
+  exposes: string[];
 }
 
 export interface DictChange {
@@ -43,79 +20,108 @@ export interface DictChange {
   new: unknown;
 }
 
-export interface DictMutatedData {
+export interface ConflictParty {
   agent_id: string;
-  version_from: number;
-  version_to: number;
-  changes: DictChange[];
-}
-
-export interface MessageSentData {
-  message_id: string;
-  from: string;
-  to: string;
-  type: MessageType;
-  priority: MessagePriority;
-  scope: string;
-  summary: string;
-  size_bytes: number;
-}
-
-export interface MessageDeliveredData {
-  message_id: string;
-  to: string;
-  processing_ms: number;
-}
-
-export interface ConflictSide {
   value: unknown;
-  version: number;
-  reason: string;
 }
 
-export interface ConflictDetectedData {
-  conflict_id: string;
-  key_path: string;
-  agents: string[];
-  values: Record<string, ConflictSide>;
-  strategy: string;
+export interface DiffSummary {
+  paths_changed: number;
+  bytes: number;
 }
 
-export interface ConflictResolvedData {
-  conflict_id: string;
-  winner: string;
-  loser: string;
-  applied_value: unknown;
-  follow_up_message_id: string;
-  rationale: string;
-}
-
-export interface MetricsTickData {
-  messages_sent: number;
-  messages_delivered: number;
-  conflicts_open: number;
-  conflicts_resolved_total: number;
-  dict_mutations_total: number;
+export interface SessionTotals {
+  events_emitted: number;
+  messages_routed: number;
+  conflicts: number;
   bytes_exchanged: number;
-  estimated_tokens_saved_pct: number;
+  duration_ms: number;
 }
 
-interface Envelope<T extends string, D> {
-  event: T;
-  v: "1.0";
+interface BaseEnvelope {
   seq: number;
   ts: string;
   session_id: string;
-  data: D;
+}
+
+export interface MeshSessionStarted extends BaseEnvelope {
+  event: "mesh.session.started";
+  agents: AgentDescriptor[];
+  config_path: string;
+}
+
+export interface MeshSessionEnded extends BaseEnvelope {
+  event: "mesh.session.ended";
+  reason: SessionEndReason;
+  totals: SessionTotals;
+}
+
+export interface AgentStateChanged extends BaseEnvelope {
+  event: "agent.state.changed";
+  agent_id: string;
+  from: AgentState;
+  to: AgentState;
+  current_task?: string | null;
+}
+
+export interface DictMutated extends BaseEnvelope {
+  event: "dict.mutated";
+  agent_id: string;
+  version: number;
+  changes: DictChange[];
+}
+
+export interface MessageSent extends BaseEnvelope {
+  event: "message.sent";
+  message_id: string;
+  from: string;
+  to: string;
+  scope: string;
+  diff_summary: DiffSummary;
+  priority?: MessagePriority;
+  correlation_id?: string | null;
+}
+
+export interface MessageDelivered extends BaseEnvelope {
+  event: "message.delivered";
+  message_id: string;
+  from: string;
+  to: string;
+  latency_ms: number;
+}
+
+export interface ConflictDetected extends BaseEnvelope {
+  event: "conflict.detected";
+  conflict_id: string;
+  path: string;
+  parties: ConflictParty[];
+  incoming_message_id: string;
+}
+
+export interface ConflictResolved extends BaseEnvelope {
+  event: "conflict.resolved";
+  conflict_id: string;
+  winner: string;
+  loser: string;
+  reason: string;
+  resolution_message_id: string;
+}
+
+export interface MetricsTick extends BaseEnvelope {
+  event: "metrics.tick";
+  messages_total: number;
+  conflicts_total: number;
+  bytes_exchanged_total: number;
+  estimated_tokens_saved_pct: number; // 0..100
 }
 
 export type AgentMeshEvent =
-  | Envelope<"mesh.session.started", SessionStartedData>
-  | Envelope<"mesh.session.ended", SessionEndedData>
-  | Envelope<"agent.state.changed", AgentStateChangedData>
-  | Envelope<"dict.mutated", DictMutatedData>
-  | Envelope<"message.sent", MessageSentData>
-  | Envelope<"message.delivered", MessageDeliveredData>
-  | Envelope<"conflict.detected", ConflictDetectedData>
-  | Envelope<"conflict.resolved", ConflictResolvedData>
-  | Envelope<"metrics.tick", MetricsTickData>;
+  | MeshSessionStarted
+  | MeshSessionEnded
+  | AgentStateChanged
+  | DictMutated
+  | MessageSent
+  | MessageDelivered
+  | ConflictDetected
+  | ConflictResolved
+  | MetricsTick;

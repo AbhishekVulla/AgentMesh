@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import type { AgentMeshEvent, AgentState, ConflictSide } from "./types/events";
+import type { AgentMeshEvent, AgentState, ConflictParty } from "./types/events";
 
 interface AgentInfo {
   id: string;
-  domain: string;
-  display_name: string;
+  role: string;
+  exposes: string[];
   state: AgentState;
-  current_task?: string;
+  current_task?: string | null;
   dict: Record<string, unknown>;
 }
 
@@ -15,25 +15,29 @@ interface MessageInfo {
   from: string;
   to: string;
   scope: string;
-  summary: string;
+  bytes: number;
+  paths_changed: number;
   ts: string;
   delivered: boolean;
 }
 
 interface ConflictInfo {
   conflict_id: string;
-  key_path: string;
-  agents: string[];
-  values: Record<string, ConflictSide>;
-  resolved?: { winner: string; loser: string; rationale: string };
+  path: string;
+  parties: ConflictParty[];
+  incoming_message_id: string;
+  resolved?: {
+    winner: string;
+    loser: string;
+    reason: string;
+  };
 }
 
 interface Metrics {
-  messages_sent: number;
-  messages_delivered: number;
-  conflicts_resolved_total: number;
-  bytes_exchanged: number;
-  estimated_tokens_saved_pct: number;
+  messages_total: number;
+  conflicts_total: number;
+  bytes_exchanged_total: number;
+  estimated_tokens_saved_pct: number; // 0..100
 }
 
 interface State {
@@ -47,10 +51,9 @@ interface State {
 }
 
 const emptyMetrics: Metrics = {
-  messages_sent: 0,
-  messages_delivered: 0,
-  conflicts_resolved_total: 0,
-  bytes_exchanged: 0,
+  messages_total: 0,
+  conflicts_total: 0,
+  bytes_exchanged_total: 0,
   estimated_tokens_saved_pct: 0,
 };
 
@@ -99,13 +102,13 @@ export const useAgentMeshStore = create<State>((set, get) => ({
         set({
           sessionId: e.session_id,
           agents: Object.fromEntries(
-            e.data.agents.map((a) => [
+            e.agents.map((a) => [
               a.id,
               {
                 id: a.id,
-                domain: a.domain,
-                display_name: a.display_name,
-                state: "idle" as AgentState,
+                role: a.role,
+                exposes: a.exposes,
+                state: "IDLE" as AgentState,
                 dict: {},
               },
             ]),
@@ -122,15 +125,15 @@ export const useAgentMeshStore = create<State>((set, get) => ({
         break;
 
       case "agent.state.changed": {
-        const a = get().agents[e.data.agent_id];
+        const a = get().agents[e.agent_id];
         if (!a) return;
         set({
           agents: {
             ...get().agents,
-            [e.data.agent_id]: {
+            [e.agent_id]: {
               ...a,
-              state: e.data.new_state,
-              current_task: e.data.current_task ?? a.current_task,
+              state: e.to,
+              current_task: e.current_task ?? a.current_task,
             },
           },
         });
@@ -138,14 +141,14 @@ export const useAgentMeshStore = create<State>((set, get) => ({
       }
 
       case "dict.mutated": {
-        const a = get().agents[e.data.agent_id];
+        const a = get().agents[e.agent_id];
         if (!a) return;
         const newDict = structuredClone(a.dict);
-        for (const ch of e.data.changes) {
+        for (const ch of e.changes) {
           if (ch.op === "delete") deletePath(newDict, ch.path);
           else setPath(newDict, ch.path, ch.new);
         }
-        set({ agents: { ...get().agents, [e.data.agent_id]: { ...a, dict: newDict } } });
+        set({ agents: { ...get().agents, [e.agent_id]: { ...a, dict: newDict } } });
         break;
       }
 
@@ -153,11 +156,12 @@ export const useAgentMeshStore = create<State>((set, get) => ({
         set({
           messages: [
             {
-              id: e.data.message_id,
-              from: e.data.from,
-              to: e.data.to,
-              scope: e.data.scope,
-              summary: e.data.summary,
+              id: e.message_id,
+              from: e.from,
+              to: e.to,
+              scope: e.scope,
+              bytes: e.diff_summary.bytes,
+              paths_changed: e.diff_summary.paths_changed,
               ts: e.ts,
               delivered: false,
             },
@@ -169,7 +173,7 @@ export const useAgentMeshStore = create<State>((set, get) => ({
       case "message.delivered":
         set({
           messages: get().messages.map((m) =>
-            m.id === e.data.message_id ? { ...m, delivered: true } : m,
+            m.id === e.message_id ? { ...m, delivered: true } : m,
           ),
         });
         break;
@@ -177,34 +181,33 @@ export const useAgentMeshStore = create<State>((set, get) => ({
       case "conflict.detected":
         set({
           activeConflict: {
-            conflict_id: e.data.conflict_id,
-            key_path: e.data.key_path,
-            agents: e.data.agents,
-            values: e.data.values,
+            conflict_id: e.conflict_id,
+            path: e.path,
+            parties: e.parties,
+            incoming_message_id: e.incoming_message_id,
           },
         });
         break;
 
       case "conflict.resolved": {
         const c = get().activeConflict;
-        if (c && c.conflict_id === e.data.conflict_id) {
+        if (c && c.conflict_id === e.conflict_id) {
           set({
             activeConflict: {
               ...c,
               resolved: {
-                winner: e.data.winner,
-                loser: e.data.loser,
-                rationale: e.data.rationale,
+                winner: e.winner,
+                loser: e.loser,
+                reason: e.reason,
               },
             },
           });
-          // Auto-dismiss 2s after resolution.
           setTimeout(() => {
             const cur = get().activeConflict;
-            if (cur && cur.conflict_id === e.data.conflict_id) {
+            if (cur && cur.conflict_id === e.conflict_id) {
               set({ activeConflict: null });
             }
-          }, 2000);
+          }, 2500);
         }
         break;
       }
@@ -212,11 +215,10 @@ export const useAgentMeshStore = create<State>((set, get) => ({
       case "metrics.tick":
         set({
           metrics: {
-            messages_sent: e.data.messages_sent,
-            messages_delivered: e.data.messages_delivered,
-            conflicts_resolved_total: e.data.conflicts_resolved_total,
-            bytes_exchanged: e.data.bytes_exchanged,
-            estimated_tokens_saved_pct: e.data.estimated_tokens_saved_pct,
+            messages_total: e.messages_total,
+            conflicts_total: e.conflicts_total,
+            bytes_exchanged_total: e.bytes_exchanged_total,
+            estimated_tokens_saved_pct: e.estimated_tokens_saved_pct,
           },
         });
         break;

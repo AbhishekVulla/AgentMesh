@@ -9,29 +9,28 @@ export function ConflictPanel() {
   return (
     <section className={`conflict-panel ${resolved ? "resolved" : "active"}`}>
       <h4>
-        {resolved ? "Resolved" : "Conflict"}: <code>{c.key_path}</code>
+        {resolved ? "Resolved" : "Conflict"}: <code>{c.path}</code>
       </h4>
       <div className="values">
-        {Object.entries(c.values).map(([agent, v]) => (
+        {c.parties.map((p) => (
           <div
-            key={agent}
+            key={p.agent_id}
             className={
               resolved
-                ? c.resolved!.winner === agent
+                ? c.resolved!.winner === p.agent_id
                   ? "side winner"
                   : "side loser"
                 : "side"
             }
           >
-            <strong>{agent}</strong>
-            <span className="val">{JSON.stringify(v.value)}</span>
-            <span className="reason">{v.reason}</span>
+            <strong>{p.agent_id}</strong>
+            <span className="val">{JSON.stringify(p.value)}</span>
           </div>
         ))}
       </div>
       {resolved && (
         <div className="resolution">
-          <strong>{c.resolved!.winner}</strong> wins — {c.resolved!.rationale}
+          <strong>{c.resolved!.winner}</strong> wins — {c.resolved!.reason}
         </div>
       )}
     </section>

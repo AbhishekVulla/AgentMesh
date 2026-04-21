@@ -58,7 +58,7 @@ export function DictTree() {
         const keys = Object.keys(a.dict);
         return (
           <div key={a.id} className="dict-tree">
-            <h4>{a.display_name}</h4>
+            <h4>{a.role}</h4>
             {keys.length === 0 ? (
               <em className="empty">empty</em>
             ) : (

@@ -14,7 +14,9 @@ export function MessageFlow() {
             <span className="arrow">→</span>
             <span className="to">{m.to}</span>
             <span className="scope">{m.scope}</span>
-            <span className="summary">{m.summary}</span>
+            <span className="summary">
+              {m.paths_changed} change{m.paths_changed === 1 ? "" : "s"} · {m.bytes}B
+            </span>
           </li>
         ))}
       </ul>

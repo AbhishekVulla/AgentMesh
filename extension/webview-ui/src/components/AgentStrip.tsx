@@ -11,12 +11,12 @@ export function AgentStrip() {
   return (
     <section className="agent-strip">
       {list.map((a) => (
-        <div key={a.id} className={`agent-card state-${a.state}`}>
+        <div key={a.id} className={`agent-card state-${a.state.toLowerCase()}`}>
           <div className="agent-head">
-            <span className="agent-name">{a.display_name}</span>
-            <span className={`state-badge ${a.state}`}>{a.state.toUpperCase()}</span>
+            <span className="agent-name">{a.role}</span>
+            <span className={`state-badge ${a.state.toLowerCase()}`}>{a.state}</span>
           </div>
-          <div className="agent-domain">{a.domain}</div>
+          <div className="agent-domain">{a.id}</div>
           {a.current_task && <div className="current-task">{a.current_task}</div>}
         </div>
       ))}
