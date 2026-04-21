@@ -55,11 +55,15 @@ class OverlayProvider implements vscode.WebviewViewProvider {
     }
 
     let html = fs.readFileSync(indexFs, "utf-8");
-    // Rewrite root-relative asset paths to webview URIs.
-    html = html.replace(/(src|href)="\/([^"]*)"/g, (_m, attr, p) => {
-      const uri = webview.asWebviewUri(vscode.Uri.joinPath(distRoot, p));
-      return `${attr}="${uri}"`;
-    });
+    // Rewrite relative asset paths (either "/foo" or "./foo") to webview URIs.
+    // Vite emits "./assets/..." by default; leave absolute http(s):// alone.
+    html = html.replace(
+      /(src|href)="(?!https?:|data:|vscode-webview:)(?:\.\/|\/)?([^"]+)"/g,
+      (_m, attr, p) => {
+        const uri = webview.asWebviewUri(vscode.Uri.joinPath(distRoot, p));
+        return `${attr}="${uri}"`;
+      },
+    );
     // Tighten CSP.
     const cspSource = webview.cspSource;
     const csp = [
