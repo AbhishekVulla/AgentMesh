@@ -126,33 +126,119 @@ function EmptyState({ connected }) {
 }
 
 // Default OfficeCanvas settings (mirrors docs/design-system/ui_kits/app/App.jsx TWEAK_DEFAULTS).
-const OFFICE_SETTINGS = {
+const DEFAULT_SETTINGS = {
   movement: true,
   chatiness: 0.6,
   speed: 1.0,
   showDesks: true,
 };
 
+const DEMO_ROLES = ["researcher", "tests", "formatter", "reviewer", "orchestrator"];
+const DEMO_STATUSES = ["working", "thinking", "waiting", "idle"];
+const DEMO_MODELS = ["sonnet-4-5", "haiku-4-5"];
+const DEMO_TOOLS = [
+  { name: "Read", arg: "README.md" },
+  { name: "Grep", arg: "useEffect" },
+  { name: "Edit", arg: "src/App.tsx:42" },
+  { name: "Bash", arg: "npm test" },
+  { name: "Write", arg: ".prettierrc" },
+];
+
+function LiveCounter({ agents, selected }) {
+  const working = agents.filter(a => a.status === "working").length;
+  const thinking = agents.filter(a => a.status === "thinking").length;
+  const waiting = agents.filter(a => a.status === "waiting").length;
+  return (
+    <div style={{
+      position: "absolute", top: 14, right: selected ? 354 : 14, zIndex: 10,
+      background: "rgba(15,19,28,0.85)", backdropFilter: "blur(12px) saturate(1.2)",
+      border: "1px solid var(--am-border-strong)", borderRadius: 10,
+      padding: "8px 12px", display: "flex", gap: 14, alignItems: "center",
+      fontFamily: "var(--am-font-mono)", fontSize: 11,
+      boxShadow: "var(--am-shadow-sm)",
+    }}>
+      <span style={{ color: "var(--am-fg-subtle)", letterSpacing: ".08em", textTransform: "uppercase", fontSize: 10 }}>Live</span>
+      <span style={{ color: "#1fd08a" }}>{working} working</span>
+      <span style={{ color: "#7a8cff" }}>{thinking} thinking</span>
+      <span style={{ color: "#f5b84c" }}>{waiting} waiting</span>
+    </div>
+  );
+}
+
 function App() {
   const url = new URLSearchParams(location.search).get("ws") || "ws://localhost:9900";
   const live = useMeshLive(url);
   const [selectedId, setSelectedId] = useState(null);
+  const [localAgents, setLocalAgents] = useState([]);
   // "office" = pixel-desk canvas (default — matches the design-system demo).
   // "mesh"   = force-directed graph (legacy dots view).
   const [view, setView] = useState("office");
   const [commandOpen, setCommandOpen] = useState(false);
+  const [tweaksOn, setTweaksOn] = useState(false);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  const updateSettings = useCallback((partial) => {
+    setSettings(prev => ({ ...prev, ...partial }));
+  }, []);
+
+  // Merge live (backend-driven) agents with locally-spawned demo agents.
+  const allAgents = useMemo(
+    () => [...live.agents, ...localAgents],
+    [live.agents, localAgents]
+  );
+
+  const spawnLocalAgent = useCallback(() => {
+    setLocalAgents(prev => {
+      const idx = prev.length;
+      const role = DEMO_ROLES[idx % DEMO_ROLES.length];
+      const status = DEMO_STATUSES[idx % DEMO_STATUSES.length];
+      const model = DEMO_MODELS[idx % DEMO_MODELS.length];
+      const tool = DEMO_TOOLS[idx % DEMO_TOOLS.length];
+      return [...prev, {
+        id: `local-${Date.now()}-${idx}`,
+        name: role,
+        role,
+        model,
+        status,
+        tool: `${tool.name} ${tool.arg}`,
+        tokens: Math.floor(20 + Math.random() * 120),
+        tools: [
+          { name: tool.name, arg: tool.arg, time: `${(0.2 + Math.random()).toFixed(1)}s`, done: false },
+        ],
+      }];
+    });
+  }, []);
+
+  const killAgent = useCallback((id) => {
+    const target = id ?? selectedId;
+    if (!target) return;
+    setLocalAgents(prev => prev.filter(a => a.id !== target));
+    setSelectedId(curr => (curr === target ? null : curr));
+  }, [selectedId]);
+
+  const handleCommand = useCallback((cmd) => {
+    if (cmd === "spawn" || cmd === "spawn-haiku") {
+      spawnLocalAgent();
+    } else if (cmd === "focus") {
+      const w = allAgents.find(a => a.status === "waiting");
+      if (w) setSelectedId(w.id);
+    } else if (cmd === "kill") {
+      setLocalAgents(prev => prev.filter(a => a.status !== "idle"));
+    }
+  }, [allAgents, spawnLocalAgent]);
 
   // pick the selected agent by agent.id string (design system uses numeric
   // ids; we use the string id directly).
   const selected = useMemo(
-    () => live.agents.find(a => a.id === selectedId) || null,
-    [live.agents, selectedId]
+    () => allAgents.find(a => a.id === selectedId) || null,
+    [allAgents, selectedId]
   );
 
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setCommandOpen(v => !v); }
-      if (e.key === "Escape") { setCommandOpen(false); setSelectedId(null); }
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); setTweaksOn(v => !v); }
+      if (e.key === "Escape") { setCommandOpen(false); setSelectedId(null); setTweaksOn(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -161,12 +247,12 @@ function App() {
   useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
 
   // Adapt live state to the shape MeshCanvas expects (numeric id).
-  const agentsForCanvas = useMemo(() => live.agents.map((a, i) => ({
+  const agentsForCanvas = useMemo(() => allAgents.map((a, i) => ({
     ...a,
     id: i + 1,
     _meshId: a.id,
     parentId: null,
-  })), [live.agents]);
+  })), [allAgents]);
 
   const onSelectCanvas = useCallback((numericId) => {
     const a = agentsForCanvas.find(x => x.id === numericId);
@@ -184,7 +270,7 @@ function App() {
             agents={agentsForCanvas}
             selectedId={canvasSelectedId}
             onSelect={onSelectCanvas}
-            settings={OFFICE_SETTINGS}
+            settings={settings}
           />
         ) : (
           <MeshCanvas
@@ -193,22 +279,24 @@ function App() {
             onSelect={onSelectCanvas}
           />
         )}
-        {live.agents.length === 0 && <EmptyState connected={live.connected} />}
+        {allAgents.length === 0 && <EmptyState connected={live.connected} />}
         <MetricsBar metrics={live.metrics} sessionId={live.sessionId} connected={live.connected} />
+        <LiveCounter agents={allAgents} selected={selected} />
         <ConflictCard conflict={live.conflict} resolution={live.recentResolution} />
         <BottomToolbar
-          onAddAgent={() => {}}
+          onAddAgent={spawnLocalAgent}
           onCommand={() => setCommandOpen(true)}
-          agentsCount={live.agents.length}
+          agentsCount={allAgents.length}
         />
-        <CommandBar open={commandOpen} onClose={() => setCommandOpen(false)} onRun={() => {}} />
+        <CommandBar open={commandOpen} onClose={() => setCommandOpen(false)} onRun={handleCommand} />
+        <TweaksPanel visible={tweaksOn} settings={settings} onChange={updateSettings} />
       </div>
       {selected && (
         <Inspector
           agent={{
             id: selected.id,
             name: selected.name,
-            model: selected.role || "mesh",
+            model: selected.model || selected.role || "mesh",
             status: selected.status,
             tool: selected.tool || "",
             tokens: selected.tokens || 0,
@@ -217,7 +305,7 @@ function App() {
             })),
           }}
           onClose={() => setSelectedId(null)}
-          onKill={() => setSelectedId(null)}
+          onKill={() => killAgent(selected.id)}
         />
       )}
     </div>
