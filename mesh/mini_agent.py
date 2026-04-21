@@ -76,22 +76,19 @@ class MiniAgent:
         if not changes:
             return
 
-        # Prefix every change path with the agent_id for wire events
-        qualified = [
-            Change(path=f"{self.agent_id}.{c.path}", op=c.op, old=c.old, new=c.new)
-            for c in changes
-        ]
-
+        # The dictionary is already nested under the agent's own key, so
+        # diff paths like `database.schema.users.columns` are already
+        # agent-qualified. Do NOT prepend agent_id.
         await self.emit(
             {
                 "event": "dict.mutated",
                 "agent_id": self.agent_id,
                 "version": self.store.version,
-                "changes": [c.to_dict() for c in qualified],
+                "changes": [c.to_dict() for c in changes],
             }
         )
 
-        routed = self.router.route(self.agent_id, qualified)
+        routed = self.router.route(self.agent_id, changes)
         for rd in routed:
             await self._send(rd)
 

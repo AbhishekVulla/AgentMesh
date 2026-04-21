@@ -60,14 +60,27 @@ def _walk(
         old_keys = set(old.keys())
         new_keys = set(new.keys())
         for k in old_keys - new_keys:
-            deletes.append(Change(_join(prefix, k), "delete", old[k], None))
+            _emit_tree(_join(prefix, k), old[k], "delete", deletes)
         for k in new_keys - old_keys:
-            adds.append(Change(_join(prefix, k), "add", None, new[k]))
+            _emit_tree(_join(prefix, k), new[k], "add", adds)
         for k in old_keys & new_keys:
             _walk(_join(prefix, k), old[k], new[k], deletes, modifies, adds)
         return
     if old != new:
         modifies.append(Change(prefix, "modify", old, new))
+
+
+def _emit_tree(path: str, value: Any, op: OpType, out: list[Change]) -> None:
+    """For a whole added/deleted subtree, emit one Change per leaf so the
+    router can match fine-grained patterns like `schema.*` or `routes.**`."""
+    if isinstance(value, dict) and value:
+        for k, v in value.items():
+            _emit_tree(_join(path, k), v, op, out)
+        return
+    if op == "add":
+        out.append(Change(path, "add", None, value))
+    else:
+        out.append(Change(path, "delete", value, None))
 
 
 def _join(prefix: str, key: str) -> str:

@@ -95,6 +95,10 @@ def _match_segments(pat: list[str], path: list[str]) -> bool:
             if _match_segments(rest, path[i:]):
                 return True
         return False
+    # Trailing `*` = one-or-more remaining segments (shell-glob convention
+    # for routing: `schema.*` means any path under schema.).
+    if head == "*" and not rest:
+        return len(path) >= 1
     if not path:
         return False
     if head == "*" or head == path[0]:

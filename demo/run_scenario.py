@@ -70,9 +70,12 @@ def main() -> int:
     time.sleep(3.0)
 
     # T+12.0 frontend adds API call without Authorization header
+    # Also records its expectation that the route is auth-less; this
+    # expectation is what makes the backend's later flip a real conflict.
     write_state("frontend", "WORKING", "Wiring /api/users call")
     write_dict("frontend", {
         "frontend": {"api_calls": {"/api/users": {"method": "GET", "headers": {}}}},
+        "backend": {"routes": {"/api/users": {"auth_required": False}}},
     })
     time.sleep(3.0)
 
