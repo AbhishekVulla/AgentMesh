@@ -1,0 +1,362 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+html,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  color: var(--vscode-foreground, #ccc);
+  background: var(--vscode-sideBar-background, #1e1e1e);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+.agentmesh-app {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px;
+  min-height: 100%;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, #333);
+}
+
+.app-title {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.session-id {
+  font-size: 10px;
+  opacity: 0.7;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.empty {
+  padding: 12px;
+  text-align: center;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* --- Agent strip --- */
+.agent-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.agent-card {
+  padding: 8px 10px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #333);
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.agent-card.state-working {
+  border-color: #2b7a0b;
+}
+
+.agent-card.state-blocked {
+  border-color: #8b0000;
+}
+
+.agent-card.state-completed {
+  border-color: #0b4f6c;
+}
+
+.agent-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agent-name {
+  font-weight: 600;
+}
+
+.agent-domain {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.current-task {
+  font-size: 11px;
+  margin-top: 6px;
+  opacity: 0.85;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.state-badge {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.state-badge.idle {
+  background: #555;
+}
+.state-badge.working {
+  background: #2b7a0b;
+}
+.state-badge.blocked {
+  background: #8b0000;
+}
+.state-badge.completed {
+  background: #0b4f6c;
+}
+
+/* --- Messages --- */
+.message-flow h4 {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.75;
+}
+
+.message-flow ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.message-flow li {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  gap: 6px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px dotted var(--vscode-editorWidget-border, #333);
+  opacity: 0.55;
+  transition: opacity 0.3s;
+}
+
+.message-flow li.delivered {
+  opacity: 1;
+}
+
+.message-flow .from {
+  color: var(--vscode-symbolIcon-variableForeground, #4fc1ff);
+}
+
+.message-flow .to {
+  color: var(--vscode-symbolIcon-keywordForeground, #c586c0);
+}
+
+.message-flow .arrow {
+  opacity: 0.5;
+}
+
+.message-flow .scope {
+  opacity: 0.8;
+}
+
+.message-flow .summary {
+  grid-column: 1 / -1;
+  padding-left: 12px;
+  font-size: 10px;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* --- Dict tree --- */
+.dict-tree-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dict-tree {
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #333);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+}
+
+.dict-tree h4 {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.dict-tree .empty {
+  opacity: 0.5;
+  font-size: 10px;
+  padding: 0;
+}
+
+.node {
+  line-height: 1.5;
+}
+
+.node.branch > .toggle {
+  cursor: pointer;
+  user-select: none;
+  color: var(--vscode-descriptionForeground, #888);
+  display: inline-block;
+  width: 12px;
+  font-size: 9px;
+}
+
+.node .key {
+  color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe);
+}
+
+.node .sep {
+  opacity: 0.5;
+}
+
+.node .val {
+  color: var(--vscode-symbolIcon-stringForeground, #ce9178);
+}
+
+.node .children {
+  margin-top: 1px;
+}
+
+/* --- Conflict panel --- */
+.conflict-panel {
+  border: 2px solid var(--vscode-errorForeground, #f14c4c);
+  background: rgba(241, 76, 76, 0.08);
+  border-radius: 4px;
+  padding: 10px;
+  animation: slideIn 0.25s ease-out;
+}
+
+.conflict-panel.resolved {
+  border-color: var(--vscode-testing-iconPassed, #73c991);
+  background: rgba(115, 201, 145, 0.08);
+}
+
+.conflict-panel h4 {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+}
+
+.conflict-panel code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  background: var(--vscode-textCodeBlock-background, #0008);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.conflict-panel .values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.conflict-panel .side {
+  padding: 6px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.conflict-panel .side strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.conflict-panel .side .val {
+  display: block;
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--vscode-symbolIcon-stringForeground, #ce9178);
+}
+
+.conflict-panel .side .reason {
+  display: block;
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.conflict-panel .side.winner {
+  border: 1px solid var(--vscode-testing-iconPassed, #73c991);
+}
+
+.conflict-panel .side.loser {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.conflict-panel .resolution {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dotted var(--vscode-editorWidget-border, #333);
+  font-size: 11px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Metrics bar --- */
+.metrics-bar {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #333);
+  border-radius: 4px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 10px;
+}
+
+.metric .label {
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric .value {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.metric.saved .value {
+  color: var(--vscode-testing-iconPassed, #73c991);
+  font-weight: 600;
+}
