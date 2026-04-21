@@ -47,6 +47,17 @@ class EventBus:
         self._server = await websockets.serve(self._handler, self.host, self.port)
 
     async def _handler(self, ws: WebSocketServerProtocol) -> None:
+        # Replay the full session so late-joining clients (e.g. the
+        # overlay opened after the scenario started) see state from seq 0.
+        if self.tee_path and self.tee_path.exists():
+            try:
+                with self.tee_path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            await ws.send(line)
+            except (websockets.ConnectionClosed, RuntimeError):
+                return
         self._clients.add(ws)
         try:
             async for _ in ws:
