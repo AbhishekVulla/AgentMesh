@@ -1,0 +1,15 @@
+# Deterministic conflict-resolution priority table.
+# docs/ARCHITECTURE.md §7. Each category lists the ordered winners —
+# earlier in the list wins against later.
+
+route_auth_changes:
+  winners: [backend, frontend, database]
+  # Example match: backend.routes./api/users.auth_required
+
+schema_changes:
+  winners: [database, backend, frontend]
+  # Example match: database.schema.<table>.*
+
+component_changes:
+  winners: [frontend, backend, database]
+  # Example match: frontend.components.*

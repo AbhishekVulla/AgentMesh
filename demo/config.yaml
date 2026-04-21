@@ -1,0 +1,35 @@
+# AgentMesh demo session config.
+#
+# Consumed by `python -m mesh.run --config demo/config.yaml`. Day-1 scope:
+# describes the 3 demo agents, their dict/input file paths, and the
+# WebSocket port. Day-2 wires this into MiniAgent + ws_server.
+
+session:
+  id_prefix: "demo"
+  duration_budget_s: 30        # integration test asserts <= 30s
+  priority_table: "demo/priority_table.yaml"
+  dependency_map: "demo/dependency_map.yaml"
+
+websocket:
+  host: "localhost"
+  port: 9900
+  tee: ".agentmesh/events/session.jsonl"
+
+agents:
+  - id: "backend"
+    role: "Backend API"
+    agent_dir: ".agentmesh/agents/backend"
+    exposes: ["routes.*", "models.*", "auth.*"]
+    subscribes: ["database.schema.*"]
+
+  - id: "frontend"
+    role: "Frontend UI"
+    agent_dir: ".agentmesh/agents/frontend"
+    exposes: ["api_calls.*"]
+    subscribes: ["backend.routes.*", "backend.auth.*"]
+
+  - id: "database"
+    role: "Database schema"
+    agent_dir: ".agentmesh/agents/database"
+    exposes: ["schema.*"]
+    subscribes: ["backend.models.*"]
