@@ -25,10 +25,12 @@ dist/
 
 # Editor / OS
 .vscode/
+!extension/.vscode/
 .idea/
 *.swp
 .DS_Store
 Thumbs.db
+*.tsbuildinfo
 
 # AgentMesh runtime artifacts (generated during demo)
 .agentmesh/
