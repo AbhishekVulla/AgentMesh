@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Type families</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .fam { display: grid; grid-template-columns: 130px 1fr 180px; align-items: center; gap: 20px; padding: 16px 18px; border-bottom: 1px solid var(--am-border); }
+  .fam:last-child { border-bottom: none; }
+  .meta { display: flex; flex-direction: column; gap: 3px; }
+  .tag { font-family: var(--am-font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--am-fg-subtle); }
+  .name { font-family: var(--am-font-sans); font-size: 13px; font-weight: 600; color: var(--am-fg); letter-spacing: -0.01em; }
+  .specimen { font-size: 36px; line-height: 1; letter-spacing: -0.02em; color: var(--am-fg); }
+  .role { font-size: 11px; color: var(--am-fg-muted); line-height: 1.45; }
+</style></head>
+<body><div class="wrap">
+  <div class="fam">
+    <div class="meta"><span class="tag">Inter Tight</span><span class="name">Product UI</span></div>
+    <span class="specimen" style="font-family:var(--am-font-sans); font-weight:600">Aa Six agents ligate</span>
+    <span class="role">Body, buttons, headings. 400 / 500 / 600 / 700.</span>
+  </div>
+  <div class="fam">
+    <div class="meta"><span class="tag">JetBrains Mono</span><span class="name">Code & telemetry</span></div>
+    <span class="specimen" style="font-family:var(--am-font-mono); font-size:28px">agent.ts  142K/200K</span>
+    <span class="role">Code, filenames, timestamps, IDs. Tabular figures.</span>
+  </div>
+  <div class="fam">
+    <div class="meta"><span class="tag">Instrument Serif</span><span class="name">Display</span></div>
+    <span class="specimen" style="font-family:var(--am-font-display); font-style:italic; font-size:44px">Quiet mesh.</span>
+    <span class="role">Oversize editorial moments only. Italic. Sparingly.</span>
+  </div>
+</div></body></html>

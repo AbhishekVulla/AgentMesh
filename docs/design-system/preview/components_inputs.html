@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Form inputs</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  label { font-family: var(--am-font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--am-fg-subtle); display: block; margin-bottom: 6px; }
+  .input { width: 100%; background: var(--am-ink-100); border: 1px solid var(--am-border-strong); border-radius: 6px; padding: 8px 10px; color: var(--am-fg); font-family: var(--am-font-sans); font-size: 13px; box-sizing: border-box; }
+  .input:focus { outline: none; border-color: var(--am-iris-400); box-shadow: 0 0 0 3px rgba(122,140,255,.25); }
+  .tog { display: flex; align-items: center; gap: 10px; }
+  .switch { width: 32px; height: 18px; border-radius: 999px; background: var(--am-ink-400); position: relative; cursor: pointer; transition: background 160ms; }
+  .switch.on { background: var(--am-mint-500); }
+  .switch::after { content:''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 999px; transition: left 160ms var(--am-ease-out); }
+  .switch.on::after { left: 16px; }
+  .check { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--am-border-strong); background: var(--am-ink-100); display: inline-flex; align-items: center; justify-content: center; }
+  .check.on { background: var(--am-mint-400); border-color: var(--am-mint-400); }
+</style></head>
+<body><div class="wrap">
+  <div><label>Search</label><input class="input" value="agent.read"/></div>
+  <div><label>Model</label><input class="input" value="claude-sonnet-4-5"/></div>
+  <div><label>Instant detection</label><div class="tog"><span class="switch on"></span><span style="font-size:13px;color:var(--am-fg)">Enabled</span></div></div>
+  <div><label>Watch all sessions</label><div class="tog"><span class="switch"></span><span style="font-size:13px;color:var(--am-fg-muted)">Off</span></div></div>
+  <div><label>Permissions</label><div class="tog"><span class="check on"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#05070b" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span style="font-size:13px;color:var(--am-fg)">Auto-approve reads</span></div></div>
+  <div><label>Scope</label><div class="tog"><span class="check"></span><span style="font-size:13px;color:var(--am-fg-muted)">Include sub-agents</span></div></div>
+</div></body></html>

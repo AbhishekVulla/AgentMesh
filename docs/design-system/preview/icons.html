@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Iconography</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 22px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; }
+  .t { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border: 1px solid var(--am-border); border-radius: 8px; }
+  .t svg { stroke: var(--am-fg); }
+  .name { font-family: var(--am-font-mono); font-size: 10px; color: var(--am-fg-muted); }
+  .note { grid-column: 1 / -1; font-size: 11px; color: var(--am-fg-subtle); font-family: var(--am-font-mono); letter-spacing: .04em; text-transform: uppercase; }
+</style></head>
+<body><div class="wrap">
+  <span class="note">Lucide · 1.5 stroke · 20px</span>
+  <div class="t"><i data-lucide="network"></i><span class="name">network</span></div>
+  <div class="t"><i data-lucide="circuit-board"></i><span class="name">circuit</span></div>
+  <div class="t"><i data-lucide="bot"></i><span class="name">bot</span></div>
+  <div class="t"><i data-lucide="play"></i><span class="name">play</span></div>
+  <div class="t"><i data-lucide="pause"></i><span class="name">pause</span></div>
+  <div class="t"><i data-lucide="terminal"></i><span class="name">terminal</span></div>
+  <div class="t"><i data-lucide="file-code"></i><span class="name">file-code</span></div>
+  <div class="t"><i data-lucide="git-branch"></i><span class="name">git-branch</span></div>
+  <div class="t"><i data-lucide="zap"></i><span class="name">zap</span></div>
+  <div class="t"><i data-lucide="settings"></i><span class="name">settings</span></div>
+  <div class="t"><i data-lucide="search"></i><span class="name">search</span></div>
+  <div class="t"><i data-lucide="plus"></i><span class="name">plus</span></div>
+  <div class="t"><i data-lucide="x"></i><span class="name">x</span></div>
+  <div class="t"><i data-lucide="check"></i><span class="name">check</span></div>
+  <div class="t"><i data-lucide="alert-triangle"></i><span class="name">alert</span></div>
+  <div class="t"><i data-lucide="arrow-right"></i><span class="name">arrow</span></div>
+</div>
+<script>lucide.createIcons();</script>
+</body></html>

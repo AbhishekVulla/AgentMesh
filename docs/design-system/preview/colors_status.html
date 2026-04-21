@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Agent status</title>
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html, body { margin:0; background: var(--am-bg); }
+  .wrap { padding: 22px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .item { background: var(--am-bg-card); border: 1px solid var(--am-border); border-radius: 12px; padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+  .node-wrap { width: 72px; height: 72px; position: relative; display: flex; align-items: center; justify-content: center; }
+  .node { width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(135deg, #3a4756, #232836); display: flex; align-items: center; justify-content: center; font-family: var(--am-font-mono); font-size: 12px; font-weight: 600; color: rgba(255,255,255,.8); border: 2px solid currentColor; position: relative; z-index: 2; }
+  .ring { position: absolute; inset: 8px; border-radius: 18px; border: 1.5px solid currentColor; opacity: 0; animation: ring 1.8s ease-out infinite; }
+  .ring2 { animation-delay: .6s; }
+  @keyframes ring { 0% { transform: scale(.8); opacity: .6 } 100% { transform: scale(1.6); opacity: 0 } }
+  .name { font-size: 13px; font-weight: 600; color: var(--am-fg); }
+  .hex { font-family: var(--am-font-mono); font-size: 10px; color: var(--am-fg-subtle); }
+  .use { font-size: 11px; color: var(--am-fg-muted); line-height: 1.4; }
+  /* states */
+  .idle { color: #5a6072; }
+  .thinking { color: #7a8cff; }
+  .working { color: #1fd08a; }
+  .waiting { color: #f5b84c; }
+  .error { color: #ff5d6b; }
+  .pulse .node { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{ box-shadow: 0 0 0 0 rgba(255,255,255,0); } 50%{ box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 22%, transparent); } }
+  .bang { position: absolute; top: -4px; right: -2px; width: 18px; height: 18px; border-radius: 999px; background: currentColor; color: #1a1200; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; z-index: 3; border: 2px solid var(--am-bg-card); }
+  .xmark { position: absolute; top: -4px; right: -2px; width: 18px; height: 18px; border-radius: 999px; background: currentColor; z-index: 3; display: flex; align-items: center; justify-content: center; border: 2px solid var(--am-bg-card); }
+</style></head>
+<body><div class="wrap">
+  <div class="item idle">
+    <div class="node-wrap"><div class="node">A1</div></div>
+    <span class="name">Idle</span>
+    <span class="hex">#5a6072</span>
+    <span class="use">Agent is resting between turns.</span>
+  </div>
+  <div class="item thinking pulse">
+    <div class="node-wrap"><span class="ring"></span><span class="ring ring2"></span><div class="node">A2</div></div>
+    <span class="name">Thinking</span>
+    <span class="hex">#7a8cff</span>
+    <span class="use">Reasoning — no tool yet.</span>
+  </div>
+  <div class="item working pulse">
+    <div class="node-wrap"><span class="ring"></span><span class="ring ring2"></span><div class="node">A3</div></div>
+    <span class="name">Working</span>
+    <span class="hex">#1fd08a</span>
+    <span class="use">Executing a tool call.</span>
+  </div>
+  <div class="item waiting pulse">
+    <div class="node-wrap"><span class="ring"></span><div class="node">A4<span class="bang">!</span></div></div>
+    <span class="name">Waiting</span>
+    <span class="hex">#f5b84c</span>
+    <span class="use">Needs approval or input.</span>
+  </div>
+  <div class="item error">
+    <div class="node-wrap"><div class="node">A5<span class="xmark"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1a0000" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div></div>
+    <span class="name">Error</span>
+    <span class="hex">#ff5d6b</span>
+    <span class="use">Failed — needs attention.</span>
+  </div>
+</div></body></html>
