@@ -1,0 +1,85 @@
+{
+  "name": "agentmesh",
+  "displayName": "AgentMesh",
+  "description": "Live visualizer for AgentMesh multi-agent coordination sessions",
+  "version": "0.1.0",
+  "publisher": "agentmesh",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Visualization", "Other"],
+  "activationEvents": [
+    "onView:agentmesh.overlay"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentmesh",
+          "title": "AgentMesh",
+          "icon": "$(globe)"
+        }
+      ]
+    },
+    "views": {
+      "agentmesh": [
+        {
+          "id": "agentmesh.overlay",
+          "name": "Overlay",
+          "type": "webview",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agentmesh.toggleSource",
+        "title": "AgentMesh: Toggle Live / Mock Source"
+      },
+      {
+        "command": "agentmesh.reconnect",
+        "title": "AgentMesh: Reconnect"
+      }
+    ],
+    "configuration": {
+      "title": "AgentMesh",
+      "properties": {
+        "agentmesh.websocketUrl": {
+          "type": "string",
+          "default": "ws://localhost:9900",
+          "description": "WebSocket URL for the AgentMesh event stream."
+        },
+        "agentmesh.mockEventsPath": {
+          "type": "string",
+          "default": "../mesh/mock_events.jsonl",
+          "description": "Relative path (from workspace root) to the JSONL mock events file used when the live socket is unavailable."
+        },
+        "agentmesh.source": {
+          "type": "string",
+          "enum": ["auto", "live", "mock"],
+          "default": "auto",
+          "description": "Event source: 'auto' = live with mock fallback; 'live' = only WebSocket; 'mock' = only replay."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "compile:webview": "cd webview-ui && npm run build",
+    "build": "npm run compile:webview && npm run compile",
+    "watch": "node esbuild.mjs --watch",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true}); require('fs').rmSync('webview-ui/dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

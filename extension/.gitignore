@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.vsix
+webview-ui/dist/
+webview-ui/node_modules/
+.vscode-test/
