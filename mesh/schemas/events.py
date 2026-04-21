@@ -118,7 +118,7 @@ class AgentStateChanged(_Envelope):
 class DictMutated(_Envelope):
     event: Literal["dict.mutated"] = "dict.mutated"
     agent_id: str
-    version: int = Field(ge=1)
+    version: int = Field(ge=0)  # 0 is the valid initial-state version
     changes: list[Change]
 
 

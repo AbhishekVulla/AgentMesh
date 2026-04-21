@@ -125,11 +125,21 @@ function EmptyState({ connected }) {
   );
 }
 
+// Default OfficeCanvas settings (mirrors docs/design-system/ui_kits/app/App.jsx TWEAK_DEFAULTS).
+const OFFICE_SETTINGS = {
+  movement: true,
+  chatiness: 0.6,
+  speed: 1.0,
+  showDesks: true,
+};
+
 function App() {
   const url = new URLSearchParams(location.search).get("ws") || "ws://localhost:9900";
   const live = useMeshLive(url);
   const [selectedId, setSelectedId] = useState(null);
-  const [view, setView] = useState("mesh");
+  // "office" = pixel-desk canvas (default — matches the design-system demo).
+  // "mesh"   = force-directed graph (legacy dots view).
+  const [view, setView] = useState("office");
   const [commandOpen, setCommandOpen] = useState(false);
 
   // pick the selected agent by agent.id string (design system uses numeric
@@ -169,11 +179,20 @@ function App() {
     <div style={{ display: "flex", width: "100vw", height: "100vh", background: "var(--am-bg)" }}>
       <LeftRail view={view} onView={setView} />
       <div style={{ flex: 1, position: "relative" }}>
-        <MeshCanvas
-          agents={agentsForCanvas}
-          selectedId={canvasSelectedId}
-          onSelect={onSelectCanvas}
-        />
+        {view === "office" ? (
+          <OfficeCanvas
+            agents={agentsForCanvas}
+            selectedId={canvasSelectedId}
+            onSelect={onSelectCanvas}
+            settings={OFFICE_SETTINGS}
+          />
+        ) : (
+          <MeshCanvas
+            agents={agentsForCanvas}
+            selectedId={canvasSelectedId}
+            onSelect={onSelectCanvas}
+          />
+        )}
         {live.agents.length === 0 && <EmptyState connected={live.connected} />}
         <MetricsBar metrics={live.metrics} sessionId={live.sessionId} connected={live.connected} />
         <ConflictCard conflict={live.conflict} resolution={live.recentResolution} />
