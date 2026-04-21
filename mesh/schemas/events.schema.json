@@ -1,0 +1,720 @@
+{
+  "$defs": {
+    "AgentDescriptor": {
+      "additionalProperties": false,
+      "description": "Describes an agent in `mesh.session.started`.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "exposes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exposes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "exposes"
+      ],
+      "title": "AgentDescriptor",
+      "type": "object"
+    },
+    "AgentStateChanged": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "agent.state.changed",
+          "default": "agent.state.changed",
+          "enum": [
+            "agent.state.changed"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "from": {
+          "enum": [
+            "IDLE",
+            "WORKING",
+            "BLOCKED",
+            "COMPLETED"
+          ],
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "enum": [
+            "IDLE",
+            "WORKING",
+            "BLOCKED",
+            "COMPLETED"
+          ],
+          "title": "To",
+          "type": "string"
+        },
+        "current_task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Task"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "agent_id",
+        "from",
+        "to"
+      ],
+      "title": "AgentStateChanged",
+      "type": "object"
+    },
+    "Change": {
+      "additionalProperties": false,
+      "description": "One entry in `dict.mutated.changes[]`.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "add",
+            "modify",
+            "delete"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "old": {
+          "default": null,
+          "title": "Old"
+        },
+        "new": {
+          "default": null,
+          "title": "New"
+        }
+      },
+      "required": [
+        "path",
+        "op"
+      ],
+      "title": "Change",
+      "type": "object"
+    },
+    "ConflictDetected": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "conflict.detected",
+          "default": "conflict.detected",
+          "enum": [
+            "conflict.detected"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "conflict_id": {
+          "title": "Conflict Id",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "parties": {
+          "items": {
+            "$ref": "#/$defs/ConflictParty"
+          },
+          "title": "Parties",
+          "type": "array"
+        },
+        "incoming_message_id": {
+          "title": "Incoming Message Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "conflict_id",
+        "path",
+        "parties",
+        "incoming_message_id"
+      ],
+      "title": "ConflictDetected",
+      "type": "object"
+    },
+    "ConflictParty": {
+      "additionalProperties": false,
+      "description": "One side of a conflict (`conflict.detected.parties[]`).",
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value"
+        }
+      },
+      "required": [
+        "agent_id",
+        "value"
+      ],
+      "title": "ConflictParty",
+      "type": "object"
+    },
+    "ConflictResolved": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "conflict.resolved",
+          "default": "conflict.resolved",
+          "enum": [
+            "conflict.resolved"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "conflict_id": {
+          "title": "Conflict Id",
+          "type": "string"
+        },
+        "winner": {
+          "title": "Winner",
+          "type": "string"
+        },
+        "loser": {
+          "title": "Loser",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "resolution_message_id": {
+          "title": "Resolution Message Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "conflict_id",
+        "winner",
+        "loser",
+        "reason",
+        "resolution_message_id"
+      ],
+      "title": "ConflictResolved",
+      "type": "object"
+    },
+    "DictMutated": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "dict.mutated",
+          "default": "dict.mutated",
+          "enum": [
+            "dict.mutated"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/Change"
+          },
+          "title": "Changes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "agent_id",
+        "version",
+        "changes"
+      ],
+      "title": "DictMutated",
+      "type": "object"
+    },
+    "DiffSummary": {
+      "additionalProperties": false,
+      "description": "Compact summary attached to `message.sent.diff_summary`.",
+      "properties": {
+        "paths_changed": {
+          "minimum": 0,
+          "title": "Paths Changed",
+          "type": "integer"
+        },
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "paths_changed",
+        "bytes"
+      ],
+      "title": "DiffSummary",
+      "type": "object"
+    },
+    "MeshSessionEnded": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "mesh.session.ended",
+          "default": "mesh.session.ended",
+          "enum": [
+            "mesh.session.ended"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "completed",
+            "aborted",
+            "error"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "totals": {
+          "$ref": "#/$defs/SessionTotals"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "reason",
+        "totals"
+      ],
+      "title": "MeshSessionEnded",
+      "type": "object"
+    },
+    "MeshSessionStarted": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "mesh.session.started",
+          "default": "mesh.session.started",
+          "enum": [
+            "mesh.session.started"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentDescriptor"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "config_path": {
+          "title": "Config Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "agents",
+        "config_path"
+      ],
+      "title": "MeshSessionStarted",
+      "type": "object"
+    },
+    "MessageDelivered": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "message.delivered",
+          "default": "message.delivered",
+          "enum": [
+            "message.delivered"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "message_id": {
+          "title": "Message Id",
+          "type": "string"
+        },
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "title": "To",
+          "type": "string"
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "title": "Latency Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "message_id",
+        "from",
+        "to",
+        "latency_ms"
+      ],
+      "title": "MessageDelivered",
+      "type": "object"
+    },
+    "MessageSent": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "message.sent",
+          "default": "message.sent",
+          "enum": [
+            "message.sent"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "message_id": {
+          "title": "Message Id",
+          "type": "string"
+        },
+        "from": {
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "title": "To",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "diff_summary": {
+          "$ref": "#/$defs/DiffSummary"
+        },
+        "priority": {
+          "default": "normal",
+          "enum": [
+            "low",
+            "normal",
+            "high"
+          ],
+          "title": "Priority",
+          "type": "string"
+        },
+        "correlation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Correlation Id"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "message_id",
+        "from",
+        "to",
+        "scope",
+        "diff_summary"
+      ],
+      "title": "MessageSent",
+      "type": "object"
+    },
+    "MetricsTick": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "string"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "event": {
+          "const": "metrics.tick",
+          "default": "metrics.tick",
+          "enum": [
+            "metrics.tick"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "messages_total": {
+          "minimum": 0,
+          "title": "Messages Total",
+          "type": "integer"
+        },
+        "conflicts_total": {
+          "minimum": 0,
+          "title": "Conflicts Total",
+          "type": "integer"
+        },
+        "bytes_exchanged_total": {
+          "minimum": 0,
+          "title": "Bytes Exchanged Total",
+          "type": "integer"
+        },
+        "estimated_tokens_saved_pct": {
+          "maximum": 100.0,
+          "minimum": 0.0,
+          "title": "Estimated Tokens Saved Pct",
+          "type": "number"
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "session_id",
+        "messages_total",
+        "conflicts_total",
+        "bytes_exchanged_total",
+        "estimated_tokens_saved_pct"
+      ],
+      "title": "MetricsTick",
+      "type": "object"
+    },
+    "SessionTotals": {
+      "additionalProperties": false,
+      "description": "Closing tallies attached to `mesh.session.ended.totals`.",
+      "properties": {
+        "events_emitted": {
+          "minimum": 0,
+          "title": "Events Emitted",
+          "type": "integer"
+        },
+        "messages_routed": {
+          "minimum": 0,
+          "title": "Messages Routed",
+          "type": "integer"
+        },
+        "conflicts": {
+          "minimum": 0,
+          "title": "Conflicts",
+          "type": "integer"
+        },
+        "bytes_exchanged": {
+          "minimum": 0,
+          "title": "Bytes Exchanged",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "events_emitted",
+        "messages_routed",
+        "conflicts",
+        "bytes_exchanged",
+        "duration_ms"
+      ],
+      "title": "SessionTotals",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "agent.state.changed": "#/$defs/AgentStateChanged",
+      "conflict.detected": "#/$defs/ConflictDetected",
+      "conflict.resolved": "#/$defs/ConflictResolved",
+      "dict.mutated": "#/$defs/DictMutated",
+      "mesh.session.ended": "#/$defs/MeshSessionEnded",
+      "mesh.session.started": "#/$defs/MeshSessionStarted",
+      "message.delivered": "#/$defs/MessageDelivered",
+      "message.sent": "#/$defs/MessageSent",
+      "metrics.tick": "#/$defs/MetricsTick"
+    },
+    "propertyName": "event"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/MeshSessionStarted"
+    },
+    {
+      "$ref": "#/$defs/MeshSessionEnded"
+    },
+    {
+      "$ref": "#/$defs/AgentStateChanged"
+    },
+    {
+      "$ref": "#/$defs/DictMutated"
+    },
+    {
+      "$ref": "#/$defs/MessageSent"
+    },
+    {
+      "$ref": "#/$defs/MessageDelivered"
+    },
+    {
+      "$ref": "#/$defs/ConflictDetected"
+    },
+    {
+      "$ref": "#/$defs/ConflictResolved"
+    },
+    {
+      "$ref": "#/$defs/MetricsTick"
+    }
+  ]
+}
