@@ -1,12 +1,10 @@
 """Priority-table-driven conflict resolver. Deterministic. No LLM.
 
-docs/ARCHITECTURE.md §7 defines the categories and winners:
+docs/ARCHITECTURE.md §7:
 
-    route_auth_changes:   [backend, frontend, database]   # backend wins
-    schema_changes:       [database, backend, frontend]   # database wins
-    component_changes:    [frontend, backend, database]   # frontend wins
-
-Skeleton for Day 2.
+    route_auth_changes:   [backend, frontend, database]
+    schema_changes:       [database, backend, frontend]
+    component_changes:    [frontend, backend, database]
 """
 from __future__ import annotations
 
@@ -16,12 +14,24 @@ from typing import Any
 
 import yaml
 
+from mesh.dict_store import tokenize_dotpath
+
+
+# Rule: category -> required subsequence of path tokens.
+# A category matches if its rule tokens appear in order within the path;
+# wildcards (`*`) match any single segment.
+_CATEGORY_RULES: list[tuple[str, list[str]]] = [
+    ("route_auth_changes", ["routes", "*", "auth_required"]),
+    ("schema_changes", ["schema", "*"]),
+    ("component_changes", ["components", "*"]),
+]
+
 
 @dataclass(frozen=True)
 class Conflict:
     conflict_id: str
     path: str
-    parties: list[dict[str, Any]]  # [{agent_id, value}, {agent_id, value}]
+    parties: list[dict[str, Any]]
     incoming_message_id: str
 
 
@@ -44,19 +54,65 @@ class ConflictResolver:
     def load(self) -> None:
         with self.priority_table_path.open("r", encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
-        # MVP: map each category to its ordered winners list.
-        self._table = {k: v.get("winners", []) for k, v in raw.items()}
+        self._table = {k: (v or {}).get("winners", []) for k, v in raw.items()}
 
     def categorize(self, path: str) -> str:
-        """Map a dot-path to a priority category. Day 2."""
-        raise NotImplementedError("Day 2")
+        segs = tokenize_dotpath(path)
+        for category, rule in _CATEGORY_RULES:
+            if _rule_matches(rule, segs):
+                return category
+        return "default"
 
     def detect(
-        self, incoming_scope: str, incoming_value: Any, own_value: Any
+        self,
+        path: str,
+        incoming_value: Any,
+        own_value: Any,
+        incoming_agent: str,
+        own_agent: str,
+        incoming_message_id: str,
+        conflict_id: str,
     ) -> Conflict | None:
-        """Return a Conflict if values disagree, else None."""
-        raise NotImplementedError("Day 2")
+        if own_value is None or incoming_value == own_value:
+            return None
+        return Conflict(
+            conflict_id=conflict_id,
+            path=path,
+            parties=[
+                {"agent_id": incoming_agent, "value": incoming_value},
+                {"agent_id": own_agent, "value": own_value},
+            ],
+            incoming_message_id=incoming_message_id,
+        )
 
-    def resolve(self, conflict: Conflict) -> Resolution:
-        """Pick a winner by priority table. Deterministic."""
-        raise NotImplementedError("Day 2 — see docs/PLAN.md Day 2 P1 Task 4")
+    def resolve(self, conflict: Conflict, resolution_message_id: str) -> Resolution:
+        category = self.categorize(conflict.path)
+        winners = self._table.get(category) or self._table.get("default") or []
+        ids = [p["agent_id"] for p in conflict.parties]
+
+        winner = next((w for w in winners if w in ids), ids[0])
+        loser = next((i for i in ids if i != winner), ids[-1])
+        reason = (
+            f"{category} priority table: " + " > ".join(winners)
+            if winners
+            else f"fallback (no winners table for {category})"
+        )
+        return Resolution(
+            conflict_id=conflict.conflict_id,
+            winner=winner,
+            loser=loser,
+            reason=reason,
+            resolution_message_id=resolution_message_id,
+        )
+
+
+def _rule_matches(rule: list[str], path_segs: list[str]) -> bool:
+    """rule must appear as an in-order subsequence of path_segs; `*` matches any."""
+    i = 0
+    for seg in path_segs:
+        if i >= len(rule):
+            break
+        token = rule[i]
+        if token == "*" or token == seg:
+            i += 1
+    return i == len(rule)
