@@ -2,6 +2,8 @@
 
 > **A deterministic coordination protocol for AI-to-AI communication.** File-as-interface, path-addressable state, zero LLM calls on the hot path.
 
+Built for **strAIght up! Hackathon 2026** (Singapore).
+
 ![AgentMesh overlay — 6 agents coordinating in a live session](docs/assets/screenshot.jpeg)
 
 ## Problem
@@ -110,8 +112,6 @@ The protocol is agent-agnostic: anything that writes `dictionary.json` participa
 ## Credits
 
 The browser overlay's pixel-office aesthetic is inspired by [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) (MIT). No source from pixel-agents is forked or modified.
-
-Built at [strAIght up! Hackathon 2026](https://lu.ma/) — Singapore, April 2026.
 
 ## License
 
