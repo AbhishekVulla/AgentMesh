@@ -46,6 +46,6 @@ def test_agent_state_changed_round_trip() -> None:
 
 def test_generated_schema_file_is_committed() -> None:
     p = Path(__file__).resolve().parents[1] / "schemas" / "events.schema.json"
-    assert p.exists(), "events.schema.json must be committed for P2 to consume"
+    assert p.exists(), "events.schema.json must be committed for the TypeScript overlay to consume"
     data = json.loads(p.read_text(encoding="utf-8"))
     assert "$defs" in data or "definitions" in data or "oneOf" in data or "anyOf" in data

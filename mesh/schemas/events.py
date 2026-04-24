@@ -1,11 +1,11 @@
 """Authoritative pydantic-v2 event models.
 
 Source of truth for the WebSocket event contract described in
-``docs/WEBSOCKET_SCHEMA.md``. The TypeScript types the P2 overlay consumes
+``docs/WEBSOCKET_SCHEMA.md``. The TypeScript types the overlay consumes
 are generated from ``Event.model_json_schema()`` → ``events.schema.json``.
 
-**Do not edit these fields without updating WEBSOCKET_SCHEMA.md and bumping
-the schema version in the commit message prefix `sync-needed:`.**
+**Do not edit these fields without updating WEBSOCKET_SCHEMA.md and the
+TypeScript mirrors in extension/src/types/events.ts.**
 """
 from __future__ import annotations
 

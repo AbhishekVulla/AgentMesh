@@ -1,6 +1,6 @@
 // TypeScript types mirroring mesh/schemas/events.py (pydantic v2).
 // Schema v1.1 — flat envelope, UPPERCASE agent states.
-// Authoritative source: https://github.com/AbhishekVulla/AgentMesh/blob/p1-backend/mesh/schemas/events.py
+// Authoritative source: ../../mesh/schemas/events.py
 
 export type AgentState = "IDLE" | "WORKING" | "BLOCKED" | "COMPLETED";
 export type MessagePriority = "low" | "normal" | "high";

@@ -1,6 +1,6 @@
 # mesh/ — protocol core
 
-Owner: **P1 (Ishaan)** on branch `p1-backend`. P2 does not edit this directory.
+The Python package implementing the AgentMesh protocol: Mini Agent sidecar, dictionary store, diff engine, router, dual-mechanism conflict resolver, and WebSocket event bus.
 
 ## Layout
 
@@ -8,43 +8,31 @@ Owner: **P1 (Ishaan)** on branch `p1-backend`. P2 does not edit this directory.
 mesh/
 ├── __init__.py              # package version
 ├── __main__.py              # `python -m mesh` → run.main
-├── run.py                   # CLI entry: `python -m mesh.run --config …`
-├── dict_store.py            # Atomic JSON store + dot-path addressing (Day 2)
-├── diff_engine.py           # Path-aware nested dict diff (Day 2)
-├── router.py                # dependency_map.yaml → per-target diff subsets (Day 2)
-├── conflict.py              # Priority-table deterministic resolver (Day 2)
-├── mini_agent.py            # Sidecar wiring watchdog → diff → route (Day 2)
-├── ws_server.py             # websockets.serve on :9900 (Day 2)
-├── mock_events.jsonl        # G2 deliverable — 56-event replay fixture for P2
+├── run.py                   # session bootstrap: `python -m mesh.run --config ...`
+├── dict_store.py            # Atomic JSON store + dot-path addressing
+├── diff_engine.py           # Path-aware nested dict diff
+├── router.py                # dependency_map.yaml → per-target diff subsets
+├── conflict.py              # Dual-mechanism resolver (Type A priority + Type B rules)
+├── mini_agent.py            # Sidecar wiring: watchdog → diff → route → conflict
+├── ws_server.py             # websockets.serve on :9900
+├── cli.py                   # `agentmesh` console script
+├── client.py                # Python client library for the event stream
 ├── schemas/
 │   ├── events.py            # Pydantic-v2 discriminated union (9 variants)
-│   └── events.schema.json   # Generated JSON Schema for P2 TypeScript types
+│   └── events.schema.json   # Generated JSON Schema
 └── tests/
-    ├── test_schema_import.py       # Smoke: schema imports + round-trips
-    └── _build_mock_events.py       # Fixture builder (regenerates mock_events.jsonl)
+    ├── test_conflict_type_b.py   # Rule evaluation unit tests
+    └── test_schema_import.py     # Schema import + round-trip
 ```
-
-## Day 1 status (this branch)
-
-- [x] Skeleton files exist — every module imports without error.
-- [x] Pydantic models cover every event in `docs/WEBSOCKET_SCHEMA.md`.
-- [x] `mesh/schemas/events.schema.json` generated and committed.
-- [x] `mesh/mock_events.jsonl` hand-authored via `_build_mock_events.py`, 56
-      schema-valid events, replays the full 26-second scenario.
-- [ ] dict_store / diff_engine / router / conflict / mini_agent / ws_server
-      bodies — **Day 2**. Each skeleton raises `NotImplementedError` with a
-      pointer to the PLAN.md task that fills it in.
 
 ## Determinism rule
 
-Every module here operates deterministically. **No LLM API calls, no network
-fetches, no randomness on the hot path.** The full demo must run with
-`ANTHROPIC_API_KEY=` and `OPENAI_API_KEY=` unset.
+Every module here operates deterministically. **No LLM API calls, no network fetches, no randomness on the hot path.** Verifiable by running the reference scenario with `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` unset — the protocol completes end-to-end.
 
-## Regenerating the mock event log
+## Running
 
 ```bash
-python -m mesh.tests._build_mock_events
+python -m mesh.run --config ../demo/config.yaml --duration 180
 ```
 
-If `docs/DEMO_SCENARIO.md` changes, re-run the builder and commit the diff.
+Starts the WebSocket server on `ws://localhost:9900`, instantiates Mini Agent sidecars per the config, and tees every event to `.agentmesh/events/session.jsonl`.

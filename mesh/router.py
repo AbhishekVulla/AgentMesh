@@ -38,8 +38,8 @@ class Router:
         """Fan a diff out to subscribers. Changes matching the same publish
         pattern for the same target+priority are collapsed into a single
         RoutedDiff whose `scope` is the longest common path prefix of the
-        grouped changes (segment-aware). This matches the mock-event shape
-        P2's overlay consumes: one message per subtree, not per leaf."""
+        grouped changes (segment-aware). The overlay consumes one message
+        per subtree, not per leaf."""
         agent_cfg = self._map.get(from_agent, {}) or {}
         publishes: dict[str, Any] = agent_cfg.get("publishes", {}) or {}
         # Group by (target, publish_pattern, priority) first; compute the

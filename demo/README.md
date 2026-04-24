@@ -1,31 +1,24 @@
-# demo/ — scripted 3-agent scenario
+# demo/ — reference scenario
 
-Owner: **P1 (Ishaan)** on branch `p1-backend`.
+Configuration + scripted drivers for the 6-agent reference scenario described in [../docs/DEMO_SCENARIO.md](../docs/DEMO_SCENARIO.md). The protocol runs for real; the "agents" are Python functions that write dictionary mutations on a timeline.
 
-Files that end up here drive a deterministic, no-LLM replay of the scenario
-in [../docs/DEMO_SCENARIO.md](../docs/DEMO_SCENARIO.md). The backend
-protocol runs for real; the "agents" are just scripted Python that write
-dictionary mutations on a timeline.
+## Files
 
-## Day 1 (this branch)
+- [`config.yaml`](config.yaml) — agents, directories, WebSocket port, tee path, duration budget
+- [`dependency_map.yaml`](dependency_map.yaml) — publish/subscribe graph (see ARCHITECTURE.md §6)
+- [`priority_table.yaml`](priority_table.yaml) — Type A conflict-resolution winners (see ARCHITECTURE.md §7.4)
+- [`run_scenario.py`](run_scenario.py) — choreographed timeline; mutates dictionary files against a running `mesh.run`
 
-- [x] `config.yaml` — agents, dirs, WS port, tee path, duration budget
-- [x] `dependency_map.yaml` — publish/subscribe graph (ARCHITECTURE.md §6)
-- [x] `priority_table.yaml` — conflict-resolution winners (ARCHITECTURE.md §7)
+## Running
 
-## Day 3 (not yet on this branch)
-
-- [ ] `backend_agent.py` — scripted backend producer
-- [ ] `frontend_agent.py` — scripted frontend producer
-- [ ] `database_agent.py` — scripted database producer
-- [ ] `run_scenario.py` — spawns Mini Agent sidecars + the three scripted
-      agents in parallel; exits when `mesh.session.ended` is emitted
-
-## Smoke test (Day 1)
+Two terminals:
 
 ```bash
-python -m mesh.run --config demo/config.yaml
+# Terminal 1 — start the protocol bus
+python -m mesh.run --config demo/config.yaml --duration 180
+
+# Terminal 2 — drive the scenario
+python -m demo.run_scenario
 ```
 
-Prints the registered agent IDs and the WebSocket endpoint. Day-2 will
-replace the placeholder with a real session bootstrap.
+Takes ~50 seconds. Produces ~13 dictionary mutations, 24 routed messages, and 2 Type B conflict resolutions. Session events tee'd to `.agentmesh/events/session.jsonl`.

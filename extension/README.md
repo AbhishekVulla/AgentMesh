@@ -1,38 +1,27 @@
 # extension — AgentMesh VS Code Visualizer
 
-Owner: **P2 (Abhi)**
+VS Code extension that visualizes live AgentMesh sessions. Connects to `ws://localhost:9900` and renders a sidebar activity-bar webview with the protocol state.
 
-The VS Code extension that visualizes live AgentMesh sessions.
+## UI
 
-## UI strategy
-
-**MVP — AgentMesh overlay (sidebar activity-bar view).** A custom TypeScript + React webview that connects to `ws://localhost:9900` and renders:
-
-- **Agent strip** — one card per agent (backend, frontend, database) with state badge (IDLE/WORKING/BLOCKED/COMPLETED), current task, and token indicator
-- **Dictionary store tree** per agent, live-updating on `dict.mutated`
-- **Message flow** — animated courier orbs between agent cards on `message.sent`/`message.delivered`
-- **Conflict panel** — slides in on `conflict.detected`, shows both values + priority-table rationale, clears green on `conflict.resolved`
-- **Metrics bar** — messages, conflicts, bytes, estimated token-savings %
-
-**Stretch — pixel-agents shim.** If Day 4 has buffer, P2 writes synthetic Claude Code JSONL records to the Claude Code project directory (`~/.claude/projects/{workspace-hash}/*.jsonl` on macOS/Linux, or the Windows equivalent under `%USERPROFILE%\.claude\`) so the separately-installed `pablodelucca/pixel-agents` extension renders 3 pixel characters in the bottom panel during the scenario. This is visual bonus, not a core demo dependency.
-
-After reviewing pixel-agents v1.3.0 source: it uses a dual-mode detection (Claude Code Hooks API preferred, 500ms JSONL polling fallback) and expects real Claude Code transcript records (`type: 'assistant'` with `message.content` array containing `tool_use` blocks using recognized tool names like Read/Edit/Write/Bash/Grep/Task). The shim must produce that format exactly.
-
-The extension **does not fork or modify pixel-agents.** If the shim is built, pixel-agents runs as shipped from the Marketplace.
+- **Agent strip** — one card per agent with state badge (IDLE/WORKING/BLOCKED/COMPLETED), current task, and dictionary tree
+- **Recent messages feed** — routed diffs showing `from → to`, scope path, change count, byte size
+- **Conflict panel** — slides in on `conflict.detected`, shows both values + resolution rule, clears green on `conflict.resolved`
+- **Metrics strip** — messages, conflicts, bytes exchanged, estimated token-savings %
 
 ## Layout
 
 ```
 extension/
-├── package.json            # vsce manifest + contributes.viewsContainers.activitybar
+├── package.json              # manifest + contributes.viewsContainers.activitybar
 ├── tsconfig.json
-├── esbuild.mjs              # bundle extension.ts + webview
+├── esbuild.mjs               # bundle extension.ts + webview
 ├── src/
-│   ├── extension.ts         # activation, webview registration
-│   ├── ws_client.ts         # WebSocket client, reconnect backoff
-│   ├── session_store.ts     # event log → webview bridge
-│   └── types/events.ts      # mirrors mesh/schemas/events.schema.json
-├── webview-ui/              # React app, bundled separately
+│   ├── extension.ts          # activation, webview registration
+│   ├── ws_client.ts          # WebSocket client with reconnect backoff
+│   ├── session_store.ts      # event log → webview bridge
+│   └── types/events.ts       # mirrors mesh/schemas/events.schema.json
+├── webview-ui/               # React app, bundled separately (Vite)
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── src/
@@ -46,8 +35,17 @@ extension/
 └── media/
 ```
 
+## Running (development)
+
+```bash
+cd extension
+npm install
+npm run build
+```
+
+Open the `extension/` folder in VS Code and press **F5** to launch the Extension Development Host. In the host window, open the AgentMesh activity-bar view; it connects to `ws://localhost:9900` automatically (set `agentmesh.source` to `live` in user settings if you need to force it).
+
 ## References
 
-- [../docs/WEBSOCKET_SCHEMA.md](../docs/WEBSOCKET_SCHEMA.md) — event contract (must match exactly)
-- [../docs/DEMO_SCENARIO.md](../docs/DEMO_SCENARIO.md) — what the overlay must show
-- [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) — upstream visualizer, stretch-integration target
+- [../docs/WEBSOCKET_SCHEMA.md](../docs/WEBSOCKET_SCHEMA.md) — event contract (must match the pydantic models)
+- [../docs/DEMO_SCENARIO.md](../docs/DEMO_SCENARIO.md) — reference scenario timeline

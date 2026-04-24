@@ -2,19 +2,19 @@
 
 > **Canonical source of truth:** [`mesh/schemas/events.py`](../mesh/schemas/events.py) (pydantic v2) → [`mesh/schemas/events.schema.json`](../mesh/schemas/events.schema.json) (JSON Schema generated from it).
 >
-> **Version:** v1.1 (flat envelope, UPPERCASE agent states). Superseded v1.0 (enveloped `{data: {...}}` + lowercase states) after P1+P2 schema sync resolved `docs/SYNC_NEEDED_SCHEMA.md` on 2026-04-21.
+> **Version:** v1.1 (flat envelope, UPPERCASE agent states).
 >
-> TypeScript mirrors live at [`extension/src/types/events.ts`](../extension/src/types/events.ts) and [`extension/webview-ui/src/types/events.ts`](../extension/webview-ui/src/types/events.ts). These must stay in sync with the pydantic models — any field change requires a `sync-needed:` commit and both owners' sign-off.
+> TypeScript mirrors live at [`extension/src/types/events.ts`](../extension/src/types/events.ts) and [`extension/webview-ui/src/types/events.ts`](../extension/webview-ui/src/types/events.ts). These must stay in sync with the pydantic models.
 >
-> The sections below remain useful as a high-level narrative but **the pydantic models are authoritative** for field names, types, and validation rules.
+> The sections below are a high-level narrative; **the pydantic models are authoritative** for field names, types, and validation rules.
 
 ## Connection
 
 - URL: `ws://localhost:9900`
 - Protocol: WebSocket (RFC 6455)
 - Wire format: UTF-8 JSON, one event per message frame
-- Server: P1 (`mesh/ws_server.py`)
-- Client: P2 (extension `src/ws_client.ts`, overlay webview consumes via `postMessage`)
+- Server: [`mesh/ws_server.py`](../mesh/ws_server.py)
+- Client: extension [`src/ws_client.ts`](../extension/src/ws_client.ts); overlay webview consumes via `postMessage`
 - Reconnection: client reconnects on drop with exponential backoff (1s, 2s, 4s, max 8s)
 - The server tees every event to `.agentmesh/events/session.jsonl` for replay / tests
 
@@ -243,7 +243,7 @@ Emitted at 1 Hz during an active session. Purely for the overlay's counter anima
 
 ## Schema validation
 
-P1 owns the authoritative JSON Schema at `mesh/schemas/events.schema.json` (generated from pydantic models). P2 runs the same schema through `ajv` on the client for debug assertions.
+The authoritative JSON Schema at `mesh/schemas/events.schema.json` is generated from the pydantic models. The overlay can run the same schema through `ajv` for debug assertions.
 
 **Any field change requires updating:**
 1. pydantic model in `mesh/schemas/events.py`
@@ -255,4 +255,4 @@ P1 owns the authoritative JSON Schema at `mesh/schemas/events.schema.json` (gene
 
 Bump `v` to `1.1`, `2.0`, etc. on any breaking change. Non-breaking (additive) changes increment the minor.
 
-For the hackathon, `v: "1.0"` is frozen. Don't change the wire format after Day 1 Hour 1.
+`v: "1.1"` is the current frozen wire format.

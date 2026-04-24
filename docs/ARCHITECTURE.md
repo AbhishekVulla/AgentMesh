@@ -1,26 +1,24 @@
-# AgentMesh — MVP Architecture
+# AgentMesh — Architecture
 
-> This is the trimmed, hackathon-scoped architecture. For the full spec (coordinator LLM arbitration, auto-split, agent adapters for Claude Code / Codex / Gemini / Ollama, achievements, replay, etc.), see the team's internal `AgentMesh_System_Architecture.md`. The full spec is a 16-week build plan; this document defines the 4-day subset we are shipping.
+> This document describes the v0.1 protocol architecture. Features deferred from v0.1 (coordinator LLM arbitration, tiered L1/L2/L3 detail system, cross-agent version vectors, Task Definition workflow, agent adapters, replay) are listed in [PRD.md](PRD.md) §4.2.
 
 ## 1. Principles
-
-Three, unchanged from the full spec:
 
 1. **File as interface.** All communication is JSON on disk.
 2. **Minimum viable context.** Only the relevant dot-paths cross agent boundaries.
 3. **Sidecar mediation.** Major agents write their dictionary; Mini Agents handle the protocol.
 
-## 2. Actors (MVP)
+## 2. Actors
 
 | Actor | Role | Count | State |
 |---|---|---|---|
-| Major Agent | Produces dictionary mutations (in demo: scripted Python) | 3 | Stateless — all state lives in its dictionary file |
+| Major Agent | Produces dictionary mutations (in reference scenario: scripted Python) | N | Stateless — all state lives in its dictionary file |
 | Mini Agent | Sidecar: owns `context.json`, `summary.json`, `input.json`, watches `dictionary.json`, diffs, routes, resolves conflicts | 1 per major agent | Stateful (file-backed) |
 | Dictionary Store | Nested JSON, dot-path addressable, versioned | 1 per agent | Persistent (JSON on disk) |
 | WebSocket Event Bus | Broadcasts protocol events to the visualizer | 1 per session | Ephemeral |
 | Visualizer | VS Code extension: sidebar overlay webview (MVP). Optional pixel-agents JSONL shim (stretch). | 1 | Consumes only |
 
-**Cut from full spec:** Coordinator process, heartbeat health monitor, archive subsystem.
+**Not in v0.1:** Coordinator process, heartbeat health monitor, archive subsystem.
 
 ## 3. The three-file system (per agent)
 
@@ -162,20 +160,20 @@ database:
     backend.models.*: L2
 ```
 
-### 6.1 Pattern-matching semantics (MVP)
+### 6.1 Pattern-matching semantics
 
 All patterns in `publishes` / `subscribes` use **path-prefix matching with an optional `.*` suffix for readability**:
 
 - `routes.*` — matches `routes./api/users`, `routes./api/users.method`, `routes./api/users.auth_required`, and any other descendant of `routes.`
 - `routes` (no suffix) — equivalent to `routes.*`
 - `routes./api/users` — matches that exact path AND all its descendants (prefix match)
-- `*.method` — NOT supported in MVP (middle/suffix wildcards require a richer matcher; add post-hackathon)
+- `*.method` — NOT supported in v0.1 (middle/suffix wildcards require a richer matcher)
 
 Implementation hint: strip any trailing `.*` from the pattern, then test if `change.path == pattern` OR `change.path.startswith(pattern + '.')`. That's it.
 
 **Scoping to a publishing agent:** when frontend declares `subscribes: backend.routes.*`, the pattern is `routes.*` within the backend agent's dictionary namespace. The router consults the publishing agent's `publishes` entries first, then cross-references against each subscriber's `subscribes` list.
 
-## 7. Conflict resolution (MVP)
+## 7. Conflict resolution
 
 Deterministic, dual-mechanism. No LLM.
 
@@ -185,7 +183,7 @@ Deterministic, dual-mechanism. No LLM.
 
 **Type B — Semantic cross-reference conflict.** Two agents wrote to *different* dot-paths, but a declared rule says those paths must be kept consistent. Example: backend sets `backend.routes./api/users.auth_required = true`, but frontend's `frontend.api_calls./api/users.headers` has no `Authorization` entry. The paths don't overlap; the rule does.
 
-The demo's hero conflict is Type B. MVP ships both.
+The reference scenario exercises both Type A (via path collisions from routed messages) and Type B (via two declared rules).
 
 ### 7.2 Type A detection (generic)
 
@@ -193,7 +191,7 @@ For each incoming `state_update` message, compare its diff paths against the rec
 
 ### 7.3 Type B detection (rules)
 
-Hardcoded in `mesh/conflict.py` as a list of rule objects (Python dataclasses, not YAML — MVP keeps it simple). Each rule has:
+Hardcoded in `mesh/conflict.py` as a list of rule objects (Python dataclasses). Each rule has:
 
 - `id`: string — e.g. `auth_required_on_route`
 - `trigger`: `{agent, path_glob, value_predicate}` — when agent X changes a path matching this glob to a value satisfying this predicate
@@ -241,7 +239,7 @@ PRIORITY_BY_PATH_PREFIX = {
 
 For a Type A conflict on path `backend.routes./api/users.auth_required`, match the key by its second segment (`routes` in this case, since first is agent-id namespace), look up the ordered list, pick the agent closest to the head that is among the conflicting parties. Exact, deterministic, zero LLM.
 
-**Full spec has coordinator-escalate + LLM arbitration. We cut both.**
+**Coordinator-escalate with LLM arbitration is deferred to a later version.**
 
 ## 8. Component responsibilities
 
@@ -289,19 +287,18 @@ def atomic_write_json(path, data):
 
 Rationale: Windows 11 does not POSIX-rename atomically on older APIs but `os.replace` works. Prevents the file watcher from reading half-written JSON.
 
-## 10. What is intentionally NOT here
+## 10. What is intentionally NOT in v0.1
 
-These appear in the full architecture doc and are **cut from the MVP**:
+Deferred features (see [PRD.md](PRD.md) §4.2 for the full list):
 
-- Version vectors (just use monotonic integer version + timestamp)
-- SHA-256 checksums per file (skip integrity layer)
-- Zlib compression for large values (out of scope for 90s demo)
-- Tiered detail system L1/L2/L3 (use L2 only — structured summary)
+- Cross-agent version vectors (v0.1 uses monotonic integer version + timestamp)
+- SHA-256 checksums per file (no integrity layer in v0.1)
+- Tiered detail system L1/L2/L3 (v0.1 transmits full diffs)
 - Heartbeat process (agents are ephemeral; session ends, they exit)
-- Coordinator process (conflicts resolved peer-to-peer via priority table)
-- Archive / decisions_log pruning (demo runs for 90s, no growth pressure)
-- `am` CLI, auto-split, guided task planner
-- LLM-assisted summarization (template-only)
+- Coordinator process (conflicts resolved peer-to-peer via priority table + declared rules)
+- Archive / decisions_log pruning
+- Task Definition Document / agent-split workflow / `am` CLI
+- LLM-assisted summarization (summaries are written by the scripted drivers in v0.1)
 
 ## 11. Tech stack
 
@@ -362,4 +359,3 @@ Scripted agents emit `agent.state.changed` events **explicitly** by calling a he
 
 - [WEBSOCKET_SCHEMA.md](WEBSOCKET_SCHEMA.md) — event contract
 - [DEMO_SCENARIO.md](DEMO_SCENARIO.md) — scenario timeline
-- Full spec: team's internal `AgentMesh_System_Architecture.md` (not committed to this repo)

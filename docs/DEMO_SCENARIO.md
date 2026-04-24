@@ -1,124 +1,77 @@
-# AgentMesh — Demo Scenario
+# AgentMesh — Reference Scenario
 
-> The 90-second choreographed scenario used for the pitch video. Deterministic, reproducible, no network calls, no LLMs.
+> The ~50-second choreographed scenario used to exercise every protocol primitive. Deterministic, reproducible, no network calls, no LLMs.
 
 ## Setup
 
-Three scripted Python "major agents" drive dictionary mutations on a timeline:
+Six scripted Python drivers mutate dictionary files on a timeline:
 
-- `backend` — simulates a Claude-Code-style backend session
-- `frontend` — simulates a Cursor/Gemini-style frontend session
-- `database` — simulates an Ollama/DB session
+- `orchestrator` — coordinates the work, emits a high-level plan
+- `researcher` — drafts the `/api/users` API contract
+- `tests` — authors test cases including migration tests
+- `formatter` — configures lint rules (PEP8 + security checks)
+- `reviewer` — approves and flags security requirements
+- `agent-6` — pins dependencies (bcrypt version)
 
-Each one is a dumb Python script that `sleep()`s between scripted mutations. They are **not** LLMs. This is the point — the protocol works without any LLM involvement, which is the "not a prompt wrapper" evidence.
+Each driver is a Python function that `sleep()`s between scripted dictionary writes. They are **not** LLMs. This is the point — the protocol works without any LLM involvement, which is the core technical claim.
 
-Each scripted agent owns an `.agentmesh/agents/{id}/dictionary.json`. Its Mini Agent sidecar watches the file, diffs it, routes changes, and handles its incoming `input.json`.
+Each scripted driver owns an `.agentmesh/agents/{id}/dictionary.json`. Its Mini Agent sidecar watches the file, diffs it, routes changes per [`demo/dependency_map.yaml`](../demo/dependency_map.yaml), and handles its incoming `input.json`.
 
 ## Timeline (T+seconds)
 
 | T | Who | Action | Dictionary mutation | Routed to | WebSocket events |
 |---|---|---|---|---|---|
 | 0.0 | — | Session starts | — | — | `mesh.session.started` |
-| 1.0 | database | State → working | — | — | `agent.state.changed` |
-| 2.0 | database | Defines users table schema | `database.schema.users.columns = [id, name, email, created_at]` | backend | `dict.mutated`, `message.sent` |
-| 4.0 | backend | State → working | — | — | `agent.state.changed` |
-| 5.0 | — | Backend's Mini Agent processes database's message | — | — | `message.delivered` |
-| 6.0 | backend | Aligns User model with schema | `backend.models.User.fields = {id: int, name: string, email: string, created_at: datetime}` | database | `dict.mutated`, `message.sent` |
-| 8.0 | backend | Adds GET `/api/users` route, auth-less initially | `backend.routes./api/users = {method: GET, auth_required: false}` | frontend | `dict.mutated`, `message.sent` |
-| 10.0 | frontend | State → working | — | — | `agent.state.changed` |
-| 11.0 | — | Frontend's Mini Agent processes backend's message | — | — | `message.delivered` |
-| 12.0 | frontend | Adds API call without Authorization header | `frontend.api_calls./api/users = {method: GET, headers: {}}` | backend | `dict.mutated`, `message.sent` |
-| 15.0 | backend | Security promote: route now requires auth | `backend.routes./api/users.auth_required = true` | frontend | `dict.mutated`, `message.sent` |
-| 17.0 | — | **Frontend's Mini Agent detects conflict** on `backend.routes./api/users.auth_required` (was implicitly false, now true, but frontend's api_call has no auth header) | — | — | `conflict.detected` |
-| 18.0 | — | Priority table: `route_auth_changes` → backend wins over frontend | Resolution written to frontend's `input.json` as `response` with `correlation_id` | frontend | `conflict.resolved` |
-| 20.0 | frontend | Applies resolution: adds auth header | `frontend.api_calls./api/users.headers = {Authorization: "Bearer {{token}}"}` | backend | `dict.mutated`, `message.sent` |
-| 22.0 | backend | Acknowledges (state → completed) | — | — | `agent.state.changed`, `message.delivered` |
-| 24.0 | database | State → completed | — | — | `agent.state.changed` |
-| 25.0 | frontend | State → completed | — | — | `agent.state.changed` |
-| 26.0 | — | Session ends | — | — | `mesh.session.ended` |
+| 2.0 | orchestrator | State → WORKING | — | — | `agent.state.changed` |
+| 3.5 | orchestrator | Declares the feature and subtasks | `orchestrator.plan.feature = "user-auth"`, `orchestrator.plan.subtasks = [...]` | researcher, agent-6 | `dict.mutated`, 2× `message.sent` |
+| 7.0 | researcher, agent-6 | State → WORKING | — | — | 2× `agent.state.changed` |
+| 9.0 | researcher | Publishes /api/users contract | `researcher.contracts./api/users.fields = {...}` | tests, formatter | `dict.mutated`, 2× `message.sent` |
+| 11.0 | tests, formatter | State → WORKING | — | — | 2× `agent.state.changed` |
+| 13.0 | agent-6 | Pins dependency | `agent-6.dependencies.bcrypt = {version: "4.0.1", checksum: ...}` | reviewer, orchestrator | `dict.mutated`, 2× `message.sent` |
+| 15.0 | tests | Publishes happy-path case | `tests.cases./api/users.happy_path = {...}` | reviewer | `dict.mutated`, `message.sent` |
+| 17.0 | formatter | Publishes initial style | `formatter.lint_rules./api/users.style = "PEP8"` | reviewer | `dict.mutated`, `message.sent` |
+| 19.0 | reviewer | State → WORKING | — | — | `agent.state.changed` |
+| 21.0 | researcher | **Flags contract as breaking change** | `researcher.contracts./api/users.breaking_change = true` | — | `dict.mutated` |
+| ~21.1 | — | **Conflict #1 fires** (Type B rule `breaking_change_needs_migration_test`): tests lacks `cases./api/users.migration_test` | — | — | `conflict.detected`, `conflict.resolved` (winner: researcher), `message.sent` (resolution to tests) |
+| 23.0 | tests | State → BLOCKED, applies resolution | `tests.cases./api/users.migration_test = {...}` | reviewer | `agent.state.changed`, `dict.mutated`, `message.sent` |
+| 26.5 | tests | State → WORKING | — | — | `agent.state.changed` |
+| 28.0 | reviewer | Drops initial approval | `reviewer.approvals./api/users.initial = true` | orchestrator, formatter | `dict.mutated`, 2× `message.sent` |
+| 30.0 | reviewer | **Demands security coverage** | `reviewer.approvals./api/users.security_required = true` | — | `dict.mutated` |
+| ~30.1 | — | **Conflict #2 fires** (Type B rule `security_review_needs_lint_check`): formatter lacks `lint_rules./api/users.security_check` | — | — | `conflict.detected`, `conflict.resolved` (winner: reviewer), `message.sent` (resolution to formatter) |
+| 33.0 | formatter | State → BLOCKED, applies resolution | `formatter.lint_rules./api/users.security_check = true` | reviewer | `agent.state.changed`, `dict.mutated`, `message.sent` |
+| 36.0 | formatter | State → WORKING | — | — | `agent.state.changed` |
+| 37.5 | reviewer | Signs off | `reviewer.approvals./api/users.approved = true` | orchestrator, formatter | `dict.mutated`, 2× `message.sent` |
+| 39.0 | orchestrator | Merging | `orchestrator.plan.status = "merged"` | researcher, agent-6 | `dict.mutated`, 2× `message.sent` |
+| 42-47 | all | State → COMPLETED (staggered) | — | — | 6× `agent.state.changed` |
+| ~50 | — | Session ends | — | — | `mesh.session.ended` |
 
-Throughout, `metrics.tick` emits at 1 Hz.
+Throughout, `metrics.tick` emits at ~1 Hz.
 
-## Final state
+## Expected totals after a clean run
 
-After the scenario runs, the three `dictionary.json` files should contain:
+- 6 agents registered
+- ~13 `dict.mutated` events
+- 24 `message.sent` / 24 `message.delivered` (routed via dependency map + 2 conflict-resolution messages)
+- 2 `conflict.detected` / 2 `conflict.resolved` (both Type B rules)
+- ~16 `agent.state.changed` events
+- Session tee'd to `.agentmesh/events/session.jsonl` for replay
 
-**`.agentmesh/agents/database/dictionary.json`**
-```json
-{
-  "_meta": { "agent_id": "database", "version": 1 },
-  "database": {
-    "schema": {
-      "users": {
-        "columns": ["id", "name", "email", "created_at"]
-      }
-    }
-  }
-}
-```
+## What the live view shows
 
-**`.agentmesh/agents/backend/dictionary.json`**
-```json
-{
-  "_meta": { "agent_id": "backend", "version": 3 },
-  "backend": {
-    "models": {
-      "User": { "fields": { "id": "int", "name": "string", "email": "string", "created_at": "datetime" } }
-    },
-    "routes": {
-      "/api/users": { "method": "GET", "auth_required": true }
-    }
-  }
-}
-```
+The VS Code sidebar and browser overlay render the session in real time:
 
-**`.agentmesh/agents/frontend/dictionary.json`**
-```json
-{
-  "_meta": { "agent_id": "frontend", "version": 2 },
-  "frontend": {
-    "api_calls": {
-      "/api/users": {
-        "method": "GET",
-        "headers": { "Authorization": "Bearer {{token}}" }
-      }
-    }
-  }
-}
-```
+- Six agent cards oscillating through IDLE → WORKING → BLOCKED → COMPLETED as scripted drivers flip their `summary.json` state
+- Dictionary trees growing under each agent card as new paths are written
+- Courier animations from source to target agents when messages are routed
+- Two conflict cards appearing in sequence: first the breaking-change/migration-test resolution, then the security-required/security-check resolution. Each card slides in on `conflict.detected` and flashes green on `conflict.resolved` with the rule ID and winner.
+- Metrics strip counting messages, conflicts, bytes exchanged, and estimated token savings versus a naive full-context baseline
 
-## What the viewer sees (2-minute video narration)
+## Determinism requirements
 
-The AgentMesh overlay (sidebar webview) is the hero. If the pixel-agents shim stretch landed, it shows in the bottom panel as a bonus — referred to as "and here's the pixel-office view for fun" rather than a central element.
+The scenario should produce the same ordered list of event types across runs (timestamps may vary). An integration test can:
 
-**Hook (0:00-0:10):** "What if agents could coordinate without an orchestrator — without shared memory — without retrofitting human tools onto AI workflows?"
-
-**Launch (0:10-0:20):** Open VS Code. Sidebar: AgentMesh overlay opens, shows three agent cards (backend, frontend, database) all IDLE, empty dictionary trees beneath each.
-
-**Work phase (0:20-0:50):** Database card transitions to WORKING, current task "Adding users table schema" appears. Tree populates with `schema.users.columns`. A courier orb animates from database card to backend card. Backend card: badge flips to WORKING, tree populates with `models.User` and `routes./api/users`. Frontend does the same.
-
-**Conflict (0:50-1:05):** Backend sets `auth_required: true`. **Conflict panel slides in**, shows side-by-side: backend value `true` with reason "Security — protect PII", frontend value `false` with reason "Built call without auth header". Narrator: "The priority table resolves this in under 50 milliseconds — no LLM call, no orchestrator, deterministic." Panel flashes green, `winner: backend` banner appears, frontend's api_calls tree updates to include the Authorization header.
-
-**Evidence (1:05-1:30):** "Every message you saw was path-filtered. The metrics bar shows 68% fewer bytes exchanged versus a naive full-context baseline. And the whole session — protocol included — runs with zero LLM calls." Terminal overlay shows `env | grep -iE 'anthropic|openai'` returning nothing, session still completes successfully.
-
-**Close (1:30-2:00):** "AgentMesh is infrastructure for AI-to-AI coordination. Swap the scripted agents for Claude Code, Codex, or any model — the protocol doesn't care. The code is public." GitHub link on screen.
-
-**Stretch (only if shim landed):** During the work phase, cut briefly to the pixel-agents bottom panel showing three characters moving at desks — reinforces "this is real coordination between identifiable agents" without distracting from the overlay.
-
-## Determinism requirements (for the integration test)
-
-The scenario MUST produce the same event `seq` values across runs (timestamps may vary). The test in `mesh/tests/test_scenario.py`:
-
-1. Runs `demo/run_scenario.py` with `SESSION_ID=test-fixture-01`
-2. Reads `.agentmesh/events/session.jsonl`
-3. Asserts the ordered list of `(seq, event)` tuples matches a golden file
-4. Asserts final dictionary states match the three JSON blobs above exactly
-5. Asserts `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` env vars are unset during the run (proves no LLM calls)
-
-## Why this scenario (judging rationale)
-
-- **Challenge-Solution fit:** Shows *actual* AI-to-AI coordination — dictionary mutations propagating across agents with zero orchestrator and zero LLM in the loop.
-- **Technological execution:** Conflict → priority-table resolution → follow-up message is all real protocol, visible in code.
-- **Product thinking:** Side-by-side (characters + data) tells two complementary stories in one screen.
-- **Originality:** The scripted-agent framing is the "gotcha" — judges who ask "but where's the LLM?" are the ones who understand the value proposition.
-- **Evidence of real demand:** Pain points (orchestrator bottleneck, context explosion, retrofit tax) are grounded in the team's ideation transcript.
+1. Run `python -m demo.run_scenario` against a running `mesh.run`
+2. Read `.agentmesh/events/session.jsonl`
+3. Assert the ordered list of event types matches a golden list
+4. Assert per-event-type counts match (2 `conflict.detected`, 2 `conflict.resolved`, 24 `message.sent`, etc.)
+5. Assert `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` env vars are unset during the run — proof that no LLM calls happened

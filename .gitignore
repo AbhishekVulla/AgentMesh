@@ -37,6 +37,13 @@ Thumbs.db
 *.log
 *.tmp
 
+# Internal build docs (kept locally, not published)
+CLAUDE.md
+STATUS.md
+docs/PLAN.md
+docs/P1_KICKOFF.md
+docs/P2_KICKOFF.md
+
 # Env / secrets
 .env
 .env.local
