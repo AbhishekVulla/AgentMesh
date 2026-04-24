@@ -111,6 +111,8 @@ The protocol is agent-agnostic: anything that writes `dictionary.json` participa
 
 The browser overlay's pixel-office aesthetic is inspired by [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) (MIT). No source from pixel-agents is forked or modified.
 
+Built at [strAIght up! Hackathon 2026](https://lu.ma/) — Singapore, April 2026.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
