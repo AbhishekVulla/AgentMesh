@@ -3,13 +3,25 @@
 # earlier in the list wins against later.
 
 route_auth_changes:
-  winners: [backend, frontend, database]
+  winners: [backend, reviewer, frontend, formatter, database]
   # Example match: backend.routes./api/users.auth_required
 
 schema_changes:
-  winners: [database, backend, frontend]
+  winners: [database, researcher, backend, reviewer, frontend, formatter]
   # Example match: database.schema.<table>.*
 
 component_changes:
-  winners: [frontend, backend, database]
+  winners: [frontend, formatter, backend, reviewer, database]
   # Example match: frontend.components.*
+
+contract_breaking_changes:
+  winners: [researcher, tests, formatter, reviewer, orchestrator, agent-6]
+  # Example match: researcher.contracts.<route>.breaking_change
+
+approval_security_reviews:
+  winners: [reviewer, formatter, tests, orchestrator, researcher, agent-6]
+  # Example match: reviewer.approvals.<route>.security_required
+
+dependency_changes:
+  winners: [agent-6, reviewer, orchestrator, researcher, tests, formatter]
+  # Example match: agent-6.dependencies.<package>.*

@@ -1,4 +1,4 @@
-# Publish/subscribe declarations.
+# Publish/subscribe declarations for the 6-agent showcase roster.
 #
 # Shape and rules from docs/ARCHITECTURE.md §6. Loaded by mesh/router.py.
 # Glob-style path patterns — `*` matches one segment, `**` matches many.
@@ -9,34 +9,63 @@
 #
 # MVP only honors tier: L2 (structured summary). Priority defaults to "normal".
 
-backend:
+orchestrator:
   publishes:
-    routes.*:
-      notify: [frontend]
-      tier: L2
-    models.*:
-      notify: [database]
-      tier: L2
-    auth.*:
-      notify: [frontend]
+    plan.*:
+      notify: [researcher, agent-6]
       tier: L2
       priority: high
   subscribes:
-    database.schema.*: L2
+    reviewer.approvals.*: L2
+    agent-6.dependencies.*: L2
 
-frontend:
+researcher:
   publishes:
-    api_calls.*:
-      notify: [backend]
+    contracts.*:
+      notify: [tests, formatter]
+      tier: L2
+      priority: high
+    spec.*:
+      notify: [reviewer]
       tier: L2
   subscribes:
-    backend.routes.*: L2
-    backend.auth.*: L2
+    orchestrator.plan.*: L2
 
-database:
+tests:
   publishes:
-    schema.*:
-      notify: [backend]
+    cases.*:
+      notify: [reviewer]
       tier: L2
   subscribes:
-    backend.models.*: L2
+    researcher.contracts.*: L2
+
+formatter:
+  publishes:
+    lint_rules.*:
+      notify: [reviewer]
+      tier: L2
+    style.*:
+      notify: [reviewer]
+      tier: L2
+  subscribes:
+    researcher.contracts.*: L2
+    reviewer.approvals.*: L2
+
+reviewer:
+  publishes:
+    approvals.*:
+      notify: [orchestrator, formatter]
+      tier: L2
+      priority: high
+  subscribes:
+    tests.cases.*: L2
+    formatter.lint_rules.*: L2
+    agent-6.dependencies.*: L2
+
+agent-6:
+  publishes:
+    dependencies.*:
+      notify: [reviewer, orchestrator]
+      tier: L2
+  subscribes:
+    orchestrator.plan.*: L2

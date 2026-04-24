@@ -32,6 +32,9 @@ from mesh.dict_store import tokenize_dotpath
 # wildcards (`*`) match any single segment.
 _CATEGORY_RULES: list[tuple[str, list[str]]] = [
     ("route_auth_changes", ["routes", "*", "auth_required"]),
+    ("contract_breaking_changes", ["contracts", "*", "breaking_change"]),
+    ("approval_security_reviews", ["approvals", "*", "security_required"]),
+    ("dependency_changes", ["dependencies", "*"]),
     ("schema_changes", ["schema", "*"]),
     ("component_changes", ["components", "*"]),
 ]
@@ -99,6 +102,32 @@ RULES: list[ConflictRule] = [
         resolution_message=(
             "Backend route {route} now requires authentication. "
             "Add Authorization header to api_calls.{route}."
+        ),
+    ),
+    ConflictRule(
+        id="breaking_change_needs_migration_test",
+        trigger_agent="researcher",
+        trigger_path_glob="contracts.*.breaking_change",
+        trigger_value_predicate=lambda v: v is True,
+        required_peer_agent="tests",
+        required_peer_path_template="cases.{route}.migration_test",
+        winner="researcher",
+        resolution_message=(
+            "Contract {route} is a breaking change. "
+            "Add a migration_test entry under cases.{route}."
+        ),
+    ),
+    ConflictRule(
+        id="security_review_needs_lint_check",
+        trigger_agent="reviewer",
+        trigger_path_glob="approvals.*.security_required",
+        trigger_value_predicate=lambda v: v is True,
+        required_peer_agent="formatter",
+        required_peer_path_template="lint_rules.{route}.security_check",
+        winner="reviewer",
+        resolution_message=(
+            "Approval {route} requires security lint coverage. "
+            "Set lint_rules.{route}.security_check=true."
         ),
     ),
 ]

@@ -1,12 +1,13 @@
-# AgentMesh demo session config.
+# AgentMesh demo session config — 6-agent showcase roster.
 #
-# Consumed by `python -m mesh.run --config demo/config.yaml`. Day-1 scope:
-# describes the 3 demo agents, their dict/input file paths, and the
-# WebSocket port. Day-2 wires this into MiniAgent + ws_server.
+# Consumed by `python -m mesh.run --config demo/config.yaml`. Matches the
+# pixel-office display in the overlay (orchestrator, researcher, tests,
+# formatter, reviewer, agent-6). `demo/run_scenario.py` drives a
+# deterministic 55s timeline against this roster.
 
 session:
   id_prefix: "demo"
-  duration_budget_s: 30        # integration test asserts <= 30s
+  duration_budget_s: 90
   priority_table: "demo/priority_table.yaml"
   dependency_map: "demo/dependency_map.yaml"
 
@@ -16,20 +17,41 @@ websocket:
   tee: ".agentmesh/events/session.jsonl"
 
 agents:
-  - id: "backend"
-    role: "Backend API"
-    agent_dir: ".agentmesh/agents/backend"
-    exposes: ["routes.*", "models.*", "auth.*"]
-    subscribes: ["database.schema.*"]
+  - id: "orchestrator"
+    role: "Orchestrator"
+    agent_dir: ".agentmesh/agents/orchestrator"
+    exposes: ["plan.*"]
+    subscribes: ["reviewer.approvals.*", "agent-6.dependencies.*"]
 
-  - id: "frontend"
-    role: "Frontend UI"
-    agent_dir: ".agentmesh/agents/frontend"
-    exposes: ["api_calls.*"]
-    subscribes: ["backend.routes.*", "backend.auth.*"]
+  - id: "researcher"
+    role: "Researcher"
+    agent_dir: ".agentmesh/agents/researcher"
+    exposes: ["contracts.*", "spec.*"]
+    subscribes: ["orchestrator.plan.*"]
 
-  - id: "database"
-    role: "Database schema"
-    agent_dir: ".agentmesh/agents/database"
-    exposes: ["schema.*"]
-    subscribes: ["backend.models.*"]
+  - id: "tests"
+    role: "Tests"
+    agent_dir: ".agentmesh/agents/tests"
+    exposes: ["cases.*"]
+    subscribes: ["researcher.contracts.*"]
+
+  - id: "formatter"
+    role: "Formatter"
+    agent_dir: ".agentmesh/agents/formatter"
+    exposes: ["lint_rules.*", "style.*"]
+    subscribes: ["researcher.contracts.*", "reviewer.approvals.*"]
+
+  - id: "reviewer"
+    role: "Reviewer"
+    agent_dir: ".agentmesh/agents/reviewer"
+    exposes: ["approvals.*"]
+    subscribes:
+      - "tests.cases.*"
+      - "formatter.lint_rules.*"
+      - "agent-6.dependencies.*"
+
+  - id: "agent-6"
+    role: "Dependency manager"
+    agent_dir: ".agentmesh/agents/agent-6"
+    exposes: ["dependencies.*"]
+    subscribes: ["orchestrator.plan.*"]
