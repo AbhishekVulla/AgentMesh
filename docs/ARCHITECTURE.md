@@ -16,7 +16,7 @@
 | Mini Agent | Sidecar: owns `context.json`, `summary.json`, `input.json`, watches `dictionary.json`, diffs, routes, resolves conflicts | 1 per major agent | Stateful (file-backed) |
 | Dictionary Store | Nested JSON, dot-path addressable, versioned | 1 per agent | Persistent (JSON on disk) |
 | WebSocket Event Bus | Broadcasts protocol events to the visualizer | 1 per session | Ephemeral |
-| Visualizer | VS Code extension: sidebar overlay webview (MVP). Optional pixel-agents JSONL shim (stretch). | 1 | Consumes only |
+| Visualizer | VS Code extension (sidebar webview) and browser overlay (pixel-office canvas). | 1+ | Consumes only |
 
 **Not in v0.1:** Coordinator process, heartbeat health monitor, archive subsystem.
 
@@ -237,7 +237,7 @@ PRIORITY_BY_PATH_PREFIX = {
 }
 ```
 
-For a Type A conflict on path `backend.routes./api/users.auth_required`, match the key by its second segment (`routes` in this case, since first is agent-id namespace), look up the ordered list, pick the agent closest to the head that is among the conflicting parties. Exact, deterministic, zero LLM.
+For a Type A conflict on path `backend.routes./api/users.auth_required`, match the key by its second segment (`routes` in this case, since first is agent-id namespace), look up the ordered list, pick the agent closest to the head that is among the conflicting parties. Exact, deterministic, lookup-table-driven.
 
 **Coordinator-escalate with LLM arbitration is deferred to a later version.**
 

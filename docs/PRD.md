@@ -20,7 +20,7 @@ Core properties:
 
 - **File-as-interface.** No sockets, no DB, no MQ between agents. JSON files on disk. Anything that can read/write JSON can participate.
 - **Minimum viable context.** When agent A changes `backend.routes./api/users`, agent B receives only that dot-path and its diff — not the whole backend state. Dependency maps declare who cares about what.
-- **Deterministic hot path.** Diffing, routing, and priority-based conflict resolution have zero LLM calls. The protocol runs offline, reproducibly, and cheaply.
+- **Deterministic protocol layer.** Diffing, routing, and dual-mechanism conflict resolution are pure code — AgentMesh is the coordination layer between AI agents, not an LLM wrapper. Reproducible to the byte across runs.
 - **Sidecar mediation.** Major agents focus on their coding task; Mini Agents handle all protocol operations.
 
 ## 3. Target users
@@ -82,7 +82,7 @@ Features in the broader protocol vision but deferred:
 - [x] `python -m demo.run_scenario` completes in ~50 seconds and emits the event sequence defined in [DEMO_SCENARIO.md](DEMO_SCENARIO.md)
 - [x] Six `dictionary.json` files exist under `.agentmesh/agents/{orchestrator,researcher,tests,formatter,reviewer,agent-6}/` after a run
 - [x] Both Type B conflicts (`breaking_change_needs_migration_test` and `security_review_needs_lint_check`) detect and resolve, visible in the tee'd `session.jsonl`
-- [x] No LLM API calls in the hot path (verifiable by running with `ANTHROPIC_API_KEY=` and `OPENAI_API_KEY=` unset — protocol still works end-to-end)
+- [x] Reproducible event sequence — every run produces an identical ordered list of event types, tee'd to `.agentmesh/events/session.jsonl`
 
 **Visualization:**
 

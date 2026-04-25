@@ -76,4 +76,4 @@ The scenario should produce the same ordered list of event types across runs (ti
 2. Read `.agentmesh/events/session.jsonl`
 3. Assert the ordered list of event types matches a golden list
 4. Assert per-event-type counts match (2 `conflict.detected`, 2 `conflict.resolved`, 24 `message.sent`, etc.)
-5. Assert `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` env vars are unset during the run — proof that no LLM calls happened
+5. Assert reproducibility: a second run produces the same ordered list of event types (timestamps and `seq` values vary by OS scheduling)
