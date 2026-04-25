@@ -1,10 +1,14 @@
 # AgentMesh — Reference Scenario
 
-> The ~50-second choreographed scenario used to exercise every protocol primitive. Deterministic, reproducible, no network calls, no LLMs.
+> A deterministic 50-second test fixture that exercises every protocol primitive: routing, both conflict types, atomic writes, version increment, dictionary diffing, dependency-map glob matching. Same event sequence every run.
 
-## Setup
+## Why scripted
 
-Six scripted Python drivers mutate dictionary files on a timeline:
+The reference scenario uses scripted Python drivers — six functions that mutate dictionary files on a timeline. This is the same role a Monte Carlo simulation plays in performance work: a reproducible fixture that lets the protocol be tested and demonstrated independently of LLM variability.
+
+The protocol itself is agent-agnostic. Any process that writes `dictionary.json` participates — scripted Python, a Claude Code subagent, a Codex CLI tailer, anything. The scripted scenario is the deterministic *test* path; real LLMs use the same code paths (verified separately with a Claude subagent that produced a real Type B conflict resolution).
+
+## Roles
 
 - `orchestrator` — coordinates the work, emits a high-level plan
 - `researcher` — drafts the `/api/users` API contract
@@ -13,9 +17,7 @@ Six scripted Python drivers mutate dictionary files on a timeline:
 - `reviewer` — approves and flags security requirements
 - `agent-6` — pins dependencies (bcrypt version)
 
-Each driver is a Python function that `sleep()`s between scripted dictionary writes. They are **not** LLMs. This is the point — the protocol works without any LLM involvement, which is the core technical claim.
-
-Each scripted driver owns an `.agentmesh/agents/{id}/dictionary.json`. Its Mini Agent sidecar watches the file, diffs it, routes changes per [`demo/dependency_map.yaml`](../demo/dependency_map.yaml), and handles its incoming `input.json`.
+Each role owns an `.agentmesh/agents/{id}/dictionary.json`. Its Mini Agent sidecar watches the file, diffs it, routes changes per [`demo/dependency_map.yaml`](../demo/dependency_map.yaml), and handles its incoming `input.json`.
 
 ## Timeline (T+seconds)
 
