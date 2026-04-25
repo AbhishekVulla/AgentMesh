@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agentmesh"
 version = "0.1.0"
-description = "File-based, protocol-driven coordination layer for AI-to-AI communication. Deterministic routing, dual-mechanism conflict resolution, zero LLM calls on the hot path."
+description = "A deterministic coordination protocol for AI-to-AI communication. File-as-interface, path-addressable state, dual-mechanism conflict resolution."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

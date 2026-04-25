@@ -10,9 +10,7 @@ AgentMesh is the answer.
 
 ![AgentMesh overlay — 6 agents coordinating in a live session](docs/assets/screenshot.jpeg)
 
-## Demo video
-
-[![AgentMesh demo](https://img.youtube.com/vi/y7LyWE7K-wI/maxresdefault.jpg)](https://www.youtube.com/watch?v=y7LyWE7K-wI)
+▶ **Demo video:** https://www.youtube.com/watch?v=y7LyWE7K-wI
 
 ## Problem
 

@@ -27,7 +27,7 @@ mesh/
 
 ## Determinism rule
 
-Every module here operates deterministically. **No LLM API calls, no network fetches, no randomness on the hot path.** Verifiable by running the reference scenario with `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` unset — the protocol completes end-to-end.
+Every module here operates deterministically. The coordination layer is pure code — the protocol diffs, routes, and resolves conflicts without external dependencies on the hot path. Reproducible to the byte across runs.
 
 ## Running
 

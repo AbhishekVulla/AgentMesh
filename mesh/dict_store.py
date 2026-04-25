@@ -150,7 +150,7 @@ def tokenize_dotpath(dotpath: str) -> list[str]:
 
 def _route_segment_closed(s: str, dot_idx: int) -> bool:
     """After a '/'-segment, the dot closes the segment iff what follows is
-    NOT another `/` continuation. MVP heuristic: if next char is '/',
+    NOT another `/` continuation. Heuristic: if next char is '/',
     we're still inside the same URL segment."""
     return (dot_idx + 1 >= len(s)) or (s[dot_idx + 1] != "/")
 

@@ -86,7 +86,7 @@ class Router:
     def _scope_for(pattern: str, relative_path: str, from_agent: str) -> str:
         """Return the scope string advertised in message.sent.
 
-        MVP: the fully-qualified path of the change (agent-prefixed).
+        Returns the fully-qualified path of the change (agent-prefixed).
         """
         return f"{from_agent}.{relative_path}" if relative_path else from_agent
 

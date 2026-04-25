@@ -48,3 +48,7 @@ docs/P2_KICKOFF.md
 .env
 .env.local
 *.pem
+docs/design-system/SKILL.md
+docs/design-system/README.md
+docs/design-system/ui_kits/app/README.md
+docs/design-system/uploads/
