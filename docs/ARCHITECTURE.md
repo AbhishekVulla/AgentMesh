@@ -312,48 +312,50 @@ Deferred features (see [PRD.md](PRD.md) §4.2 for the full list):
 
 ## 12. Runtime orchestration (`demo/run_scenario.py`)
 
-Single Python process, multiple threads. Simpler than subprocesses.
+Two processes: the protocol bus and the scenario driver.
 
 ```
-demo/run_scenario.py
-├── main thread — orchestrates startup/shutdown
-├── asyncio event loop (on a dedicated thread)
-│   ├── mesh.ws_server  — serves WebSocket on :9900
-│   └── mesh.MiniAgent × 3  — file watchers + routing + conflict detection
-└── 3 worker threads — one per scripted "major agent" (backend / frontend / database)
-    └── each sleeps + mutates its .agentmesh/agents/{id}/dictionary.json per timeline
+Terminal 1: python -m mesh.run --config demo/config.yaml
+├── asyncio event loop
+│   ├── mesh.ws_server     — serves WebSocket on :9900
+│   └── mesh.MiniAgent × N — one per agent in config.yaml; each watches
+│                            its agent_dir/{dictionary,summary,input}.json
+└── tees every event to .agentmesh/events/session.jsonl
+
+Terminal 2: python -m demo.run_scenario
+└── single-process driver — calls dict_store.set() against each agent's
+    dictionary.json on a timeline. Mini Agents (in Terminal 1) detect
+    the mtime change, diff, route, and emit events.
 ```
 
 ### 12.1 Startup sequence
 
-1. Create working dir `.agentmesh/` (wipe if exists). Create `.agentmesh/agents/{backend,frontend,database}/` with empty `dictionary.json`, `context.json`, `summary.json`, `input.json` files.
-2. Load `demo/dependency_map.yaml`.
-3. Start asyncio loop on a dedicated thread. Start `ws_server` (broadcasts `mesh.session.started`). Start 3 `MiniAgent` instances, each watching one agent dir.
-4. Brief sleep (100ms) to let file watchers settle.
-5. Spawn 3 worker threads, each running its scripted-agent timeline function (`demo.backend_agent.run_timeline()`, etc.). Each scripted agent knows its own dict path and uses `atomic_write_json` for every mutation.
-6. Main thread `join()`s the 3 scripted workers.
-7. Brief sleep (500ms) to let the last events propagate through Mini Agents and the ws server.
-8. `ws_server` broadcasts `mesh.session.ended` with totals.
-9. Cancel the asyncio loop; exit.
+1. Operator wipes `.agentmesh/` (optional, for clean runs).
+2. **Terminal 1:** `python -m mesh.run --config demo/config.yaml --duration 180`
+   - Creates `.agentmesh/agents/{id}/` for each agent in the config (six in the reference scenario), with empty `dictionary.json`, `summary.json`, `input.json`.
+   - Loads `demo/dependency_map.yaml` + `demo/priority_table.yaml`.
+   - Starts the WebSocket server, broadcasts `mesh.session.started`.
+   - Starts a `MiniAgent` instance per agent, each watching its directory.
+3. **Terminal 2:** `python -m demo.run_scenario`
+   - Single-threaded Python script that opens a `DictStore` for each agent and calls `store.set(dotpath, value)` on a timeline (with `time.sleep` between writes).
+   - Each `set` triggers `dict_store.atomic_write_json` → file mtime changes → Mini Agent in Terminal 1 detects + processes.
+4. Mini Agents emit `dict.mutated` → router fans out → `message.sent` → target Mini Agent's `drain_input` → `message.delivered` → `_apply_incoming` runs Type A detection → `_evaluate_type_b` runs Type B rules.
+5. Conflicts produce `conflict.detected` + `conflict.resolved` events with priority-table or rule-based winners.
+6. After ~50s the scenario script exits. Terminal 1 keeps running until `--duration` elapses (or Ctrl+C), then broadcasts `mesh.session.ended`.
 
 ### 12.2 State-change signal convention
 
-Scripted agents emit `agent.state.changed` events **explicitly** by calling a helper (`mesh.signal.state(agent_id, new_state, current_task=...)`) that writes a tiny control record to `.agentmesh/agents/{id}/state.signal`. The Mini Agent's file watcher picks it up and broadcasts the WebSocket event. Mini Agents do not infer state from dictionary mutations.
+Scripted drivers flip an agent's state by writing a small JSON record to `.agentmesh/agents/{id}/summary.json` (e.g., `{"state": "WORKING", "current_task": "..."}`). The session loop polls `summary.json` mtime, detects the change, and broadcasts `agent.state.changed` over the WebSocket bus. States: `IDLE | WORKING | BLOCKED | COMPLETED`.
 
-### 12.3 Cross-thread comms
+### 12.3 Cross-process coordination
 
-- asyncio loop ↔ worker threads: `asyncio.run_coroutine_threadsafe` for pushing events onto the ws_server's broadcast queue.
-- Worker threads write dict files; file watcher (running in the asyncio loop) detects changes via `watchdog`'s `PollingObserver` (cross-platform reliable).
+- Mini Agents (Terminal 1) and the scenario driver (Terminal 2) communicate **only through the filesystem** — no IPC, no sockets between them.
+- `dict_store.atomic_write_json` (`tempfile.mkstemp` + `os.replace`) ensures Mini Agents never read a half-written file.
+- The session loop polls each agent's `dictionary.json` and `summary.json` mtime once per tick; changes trigger handlers.
 
-### 12.4 Integration test timing
+### 12.4 Reproducibility
 
-`mesh/tests/test_scenario.py` runs the full scenario once. Assertions are **loose on timing, strict on order + count**:
-
-- `events = [e for e in session.jsonl]` — list all emitted events
-- Assert `[e.event for e in events]` matches a golden ordered list of event type names
-- Assert per-event-type counts match (e.g., exactly 1 `conflict.detected`, exactly 1 `conflict.resolved`, 4+ `message.sent`)
-- Assert final dictionary JSON blobs match exactly (byte-for-byte) the targets in DEMO_SCENARIO.md
-- Do NOT assert on `ts` fields or exact `seq` numbers — OS scheduling causes jitter
+Every session writes its full event log to `.agentmesh/events/session.jsonl`. Two runs of the reference scenario produce the same ordered list of event types (timestamps and `seq` values vary by OS scheduling). Unit tests under `mesh/tests/` cover the conflict-rule evaluation logic and schema round-trip; integration testing of the full scenario is done by inspecting the tee'd JSONL.
 
 ## 13. References
 

@@ -7,7 +7,7 @@
 # Each publishes entry describes ONE outbound rule:
 #   <pattern>: { notify: [<target_agent_ids>], tier: <L1|L2|L3>, priority: <low|normal|high> }
 #
-# MVP only honors tier: L2 (structured summary). Priority defaults to "normal".
+# Tier defaults to L2 (structured summary). Priority defaults to "normal".
 
 orchestrator:
   publishes:

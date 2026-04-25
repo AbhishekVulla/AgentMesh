@@ -183,7 +183,7 @@ def cmd_attach(args: argparse.Namespace) -> int:
         while True:
             time.sleep(0.5)
             # Drain any incoming messages and print them so the caller can
-            # react in-stream. MVP: just print.
+            # react in-stream.
             incoming = client.drain_input()
             for msg in incoming:
                 print(f"[in] {msg['from']} scope={msg['scope']} "
