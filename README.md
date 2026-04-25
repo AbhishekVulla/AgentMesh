@@ -1,10 +1,18 @@
 # AgentMesh
 
-> **A deterministic coordination protocol for AI-to-AI communication.** File-as-interface, path-addressable state, zero LLM calls on the hot path.
+> **A deterministic coordination protocol for AI-to-AI communication.** File-as-interface, path-addressable state, dual-mechanism conflict resolution.
 
-Built for **strAIght up! Hackathon 2026** (Singapore).
+Built for **strAIght up! Hackathon 2026** (Singapore) — Theme E:
+
+> *Most software infrastructure today assumes humans are the primary operators. But agentic systems increasingly need to coordinate with other agents, tools, and environments directly. How might we build infrastructure designed for AI-to-AI interaction, rather than retrofitting human-centered software for agent workflows?*
+
+AgentMesh is the answer.
 
 ![AgentMesh overlay — 6 agents coordinating in a live session](docs/assets/screenshot.jpeg)
+
+## Demo video
+
+[![AgentMesh demo](https://img.youtube.com/vi/y7LyWE7K-wI/maxresdefault.jpg)](https://www.youtube.com/watch?v=y7LyWE7K-wI)
 
 ## Problem
 
@@ -23,7 +31,7 @@ Three design principles:
 
 1. **File as interface.** Communication is JSON on disk. Anything that can read or write JSON can participate — no vendor SDK, no sockets, no shared database between agents.
 2. **Minimum viable context.** When agent A changes `backend.routes./api/users.auth_required`, agent B receives only that dot-path and its diff — not the whole backend state. Dependency maps declare who cares about what.
-3. **Sidecar mediation.** Major agents focus on their coding task. Mini Agents handle diffing, routing, conflict detection, and delivery — deterministically, with zero LLM involvement.
+3. **Sidecar mediation.** Major agents focus on their coding task. Mini Agents handle diffing, routing, conflict detection, and delivery — deterministically, in pure code.
 
 ## What's in the box
 
@@ -62,9 +70,9 @@ Three design principles:
 | **VS Code extension** | Activity-bar sidebar webview. Live agent cards, recent-messages feed, dict tree per agent, metrics strip. |
 | **Browser overlay** | Pixel-office view. Agents as characters in a virtual workspace, messages as courier orbs, conflicts as resolution cards. |
 
-**Zero LLM calls on the hot path.** Diffing, routing, and conflict resolution are pure code. Verified by running with `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` unset — the protocol completes end-to-end.
+**AgentMesh is the coordination layer between AI agents — not an LLM wrapper.** The 2,500-line protocol handles diffing, routing, and dual-mechanism conflict resolution as deterministic code. AI agents (Claude Code, Codex, Gemini, Ollama) plug in as the *consumers* of this protocol.
 
-## Run it (no API keys required)
+## Run it
 
 ```bash
 git clone https://github.com/AbhishekVulla/AgentMesh
@@ -92,7 +100,6 @@ The reference scenario runs deterministically in ~50 seconds — same event sequ
 | Routed messages per run | 24 (deterministic) | `.agentmesh/events/session.jsonl` |
 | Conflicts auto-resolved per run | 2 (both Type B semantic rules) | priority table + declared rules |
 | Bytes on the wire (typical run) | ~7,660 B total | `metrics.tick` events |
-| LLM calls on the coordination path | 0 | verifiable with `unset ANTHROPIC_API_KEY OPENAI_API_KEY` before running |
 
 ## Verification
 
@@ -102,7 +109,7 @@ The protocol is agent-agnostic — any process that writes `dictionary.json` par
 
 2. **Real-LLM integration** — a Claude subagent driving the mesh produced a real Type B conflict (incompatible auth/header state across two agents) and the protocol detected + resolved it deterministically. Same code paths as the scripted scenario; the only difference is who writes `dictionary.json`.
 
-3. **Offline correctness** — running with `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` unset, the full reference scenario still completes end-to-end. Zero LLM on the coordination path is structural, not aspirational.
+3. **Reproducibility** — every session's events are tee'd to `.agentmesh/events/session.jsonl`. Integration tests assert the exact ordered event sequence on every run; the protocol is reproducible to the byte.
 
 Adapters for additional providers (OpenAI, Gemini, Ollama, Cursor, Aider) follow the same pattern: anything that mutates `dictionary.json` participates. The adapter layer is mechanical.
 
@@ -111,6 +118,15 @@ Adapters for additional providers (OpenAI, Gemini, Ollama, Cursor, Aider) follow
 Canonical source: [`mesh/schemas/events.py`](mesh/schemas/events.py) (pydantic v2) → [`mesh/schemas/events.schema.json`](mesh/schemas/events.schema.json) (generated JSON Schema). TypeScript mirrors in [`extension/src/types/events.ts`](extension/src/types/events.ts).
 
 Nine event variants: `mesh.session.started` / `mesh.session.ended` / `agent.state.changed` / `dict.mutated` / `message.sent` / `message.delivered` / `conflict.detected` / `conflict.resolved` / `metrics.tick`. Field-level documentation in [`docs/WEBSOCKET_SCHEMA.md`](docs/WEBSOCKET_SCHEMA.md).
+
+## Who this is for
+
+Infrastructure consumers, not end users:
+
+- **Orchestrator authors** (LangGraph, AutoGen, CrewAI, custom) — a standard inter-agent protocol instead of hand-rolled JSON
+- **IDE authors** (Cursor, Windsurf, Zed) adding multi-agent coordination — a non-proprietary wire format with a reference visualization
+- **Individual developers** running parallel agents locally (Claude Code + Codex + Ollama) — deterministic coordination without a heavy orchestrator
+- **Multi-agent systems researchers** — a reproducible, inspectable protocol to measure coordination quality
 
 ## Repository layout
 
